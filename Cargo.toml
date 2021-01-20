@@ -10,5 +10,5 @@ edition = "2018"
 rand = "0.8"
 tokio = { version = "1", features = ["time", "sync"] }
 
-[dev.dependencies]
+[dev-dependencies]
 tokio = { version = "1", features = ["full"] }
