@@ -1,14 +1,14 @@
 use std::ops::{Deref, DerefMut};
 use std::time::Instant;
 
-use crate::expiration::SweepingCacheExpiration;
+use crate::expiration::CacheExpiration;
 
-pub struct SweepingCacheEntry<V> {
+pub struct CacheEntry<V> {
     pub(crate) value: V,
-    pub(crate) expiration: Option<SweepingCacheExpiration>,
+    pub(crate) expiration: Option<CacheExpiration>,
 }
 
-impl<V> Deref for SweepingCacheEntry<V> {
+impl<V> Deref for CacheEntry<V> {
     type Target = V;
 
     fn deref(&self) -> &Self::Target {
@@ -16,14 +16,14 @@ impl<V> Deref for SweepingCacheEntry<V> {
     }
 }
 
-impl<V> DerefMut for SweepingCacheEntry<V> {
+impl<V> DerefMut for CacheEntry<V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.value_mut()
     }
 }
 
-impl<V> SweepingCacheEntry<V> {
-    pub fn expiration(&self) -> Option<&SweepingCacheExpiration> {
+impl<V> CacheEntry<V> {
+    pub fn expiration(&self) -> Option<&CacheExpiration> {
         self.expiration.as_ref()
     }
 

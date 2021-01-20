@@ -7,11 +7,12 @@ use tokio::sync::{RwLock, RwLockReadGuard};
 use tokio::time;
 
 mod entry;
-use entry::SweepingCacheEntry;
+use entry::CacheEntry;
 
 mod expiration;
-use expiration::SweepingCacheExpiration;
+use expiration::CacheExpiration;
 
+// Define small private macro to unpack entry references.
 macro_rules! unpack {
     ($entry: expr) => {
         if $entry.is_expired() {
@@ -22,13 +23,11 @@ macro_rules! unpack {
     };
 }
 
-type Lookup<V> = Option<SweepingCacheEntry<V>>;
-
-pub struct SweepingCache<K, V> {
-    store: RwLock<BTreeMap<K, SweepingCacheEntry<V>>>,
+pub struct Cache<K, V> {
+    store: RwLock<BTreeMap<K, CacheEntry<V>>>,
 }
 
-impl<K, V> SweepingCache<K, V>
+impl<K, V> Cache<K, V>
 where
     K: Ord + Clone,
 {
@@ -42,7 +41,7 @@ where
         self.store.write().await.clear()
     }
 
-    pub async fn get(&self, k: &K) -> Option<RwLockReadGuard<'_, SweepingCacheEntry<V>>> {
+    pub async fn get(&self, k: &K) -> Option<RwLockReadGuard<'_, CacheEntry<V>>> {
         let guard = self.store.read().await;
         let guard = RwLockReadGuard::try_map(guard, |guard| unpack!(guard.get(k)?));
 
@@ -53,13 +52,13 @@ where
         self.store.read().await.len()
     }
 
-    pub async fn insert(&self, k: K, v: V) -> Lookup<V> {
+    pub async fn insert(&self, k: K, v: V) -> Option<CacheEntry<V>> {
         self.do_insert(k, v, None).await
     }
 
-    pub async fn insert_with_expiration<E>(&self, k: K, v: V, e: E) -> Lookup<V>
+    pub async fn insert_with_expiration<E>(&self, k: K, v: V, e: E) -> Option<CacheEntry<V>>
     where
-        E: Into<SweepingCacheExpiration>,
+        E: Into<CacheExpiration>,
     {
         self.do_insert(k, v, Some(e.into())).await
     }
@@ -94,7 +93,7 @@ where
 
                 {
                     let mut prev = 0;
-                    let mut iter: Box<dyn Iterator<Item = (&K, &SweepingCacheEntry<V>)>> =
+                    let mut iter: Box<dyn Iterator<Item = (&K, &CacheEntry<V>)>> =
                         Box::new(store.iter());
 
                     for idx in indices {
@@ -126,7 +125,7 @@ where
         }
     }
 
-    pub async fn remove(&self, k: &K) -> Lookup<V> {
+    pub async fn remove(&self, k: &K) -> Option<CacheEntry<V>> {
         self.store
             .write()
             .await
@@ -144,8 +143,8 @@ where
         }
     }
 
-    async fn do_insert(&self, k: K, v: V, e: Option<SweepingCacheExpiration>) -> Lookup<V> {
-        let entry = SweepingCacheEntry {
+    async fn do_insert(&self, k: K, v: V, e: Option<CacheExpiration>) -> Option<CacheEntry<V>> {
+        let entry = CacheEntry {
             value: v,
             expiration: e,
         };
@@ -158,11 +157,11 @@ where
     }
 }
 
-impl<K, V> Default for SweepingCache<K, V>
+impl<K, V> Default for Cache<K, V>
 where
     K: Ord + Clone,
 {
     fn default() -> Self {
-        SweepingCache::new()
+        Cache::new()
     }
 }
