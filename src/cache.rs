@@ -12,9 +12,9 @@ use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
+use async_timer::Interval;
 use rand::prelude::*;
 use tokio::sync::{RwLock, RwLockReadGuard};
-use tokio::time;
 
 use crate::entry::{CacheEntry, CacheExpiration};
 
@@ -54,13 +54,25 @@ where
         self.store.write().await.clear()
     }
 
+    /// Retrieve the number of expired entries inside the cache.
+    ///
+    /// Note that this is calculated by walking the set of entries and
+    /// should therefore not be used in performance sensitive situations.
+    pub async fn expired(&self) -> usize {
+        self.store
+            .read()
+            .await
+            .iter()
+            .filter(|(_, entry)| entry.is_expired())
+            .count()
+    }
+
     /// Retrieve a reference to a value inside the cache.
     ///
     /// The returned reference is bound inside a `RwLockReadGuard`.
     pub async fn get(&self, k: &K) -> Option<RwLockReadGuard<'_, CacheEntry<V>>> {
         let guard = self.store.read().await;
         let guard = RwLockReadGuard::try_map(guard, |guard| unpack!(guard.get(k)?));
-
         guard.ok()
     }
 
@@ -113,10 +125,10 @@ where
     /// cache storing expired entries (assuming the monitor just ran), so make sure
     /// to tune your frequency, sample size, and threshold accordingly.
     pub async fn monitor(&self, sample: usize, threshold: f64, frequency: Duration) {
-        let mut interval = time::interval(frequency);
+        let mut interval = Interval::platform_new(frequency);
 
         loop {
-            interval.tick().await;
+            interval.as_mut().await;
 
             let mut store = self.store.write().await;
             let mut rng = rand::thread_rng();
@@ -142,9 +154,13 @@ where
                         Box::new(store.iter());
 
                     for idx in indices {
-                        let offset = cmp::min(0, idx - prev - 1);
+                        let offset = idx
+                            .checked_sub(prev)
+                            .and_then(|idx| idx.checked_sub(1))
+                            .unwrap_or(0);
 
                         iter = Box::new(iter.skip(offset));
+                        prev = idx;
 
                         let (key, entry) = iter.next().unwrap();
 
@@ -153,9 +169,7 @@ where
                         }
 
                         keys.push(key.to_owned());
-
                         gone += 1.0;
-                        prev = idx;
                     }
                 }
 
@@ -177,6 +191,19 @@ where
             .await
             .remove(k)
             .and_then(|entry| unpack!(entry))
+    }
+
+    /// Retrieve the number of unexpired entries inside the cache.
+    ///
+    /// Note that this is calculated by walking the set of entries and
+    /// should therefore not be used in performance sensitive situations.
+    pub async fn unexpired(&self) -> usize {
+        self.store
+            .read()
+            .await
+            .iter()
+            .filter(|(_, entry)| !entry.is_expired())
+            .count()
     }
 
     /// Updates an entry in the cache without changing the expiration.
