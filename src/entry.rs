@@ -88,6 +88,11 @@ impl CacheExpiration {
     pub fn instant(&self) -> &Instant {
         &self.instant
     }
+
+    /// Retrieve the time remaning before expiration.
+    pub fn remaining(&self) -> Duration {
+        self.instant.saturating_duration_since(Instant::now())
+    }
 }
 
 // Automatic conversation from `Instant`.
