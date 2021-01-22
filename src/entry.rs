@@ -13,6 +13,7 @@ use rand::prelude::*;
 ///
 /// Each entry has a value and optional expiration associated, with
 /// the value being seen through the `Deref` trait for convenience.
+#[derive(Debug)]
 pub struct CacheEntry<V> {
     pub(crate) value: V,
     pub(crate) expiration: Option<CacheExpiration>,
@@ -77,6 +78,7 @@ impl<V> DerefMut for CacheEntry<V> {
 /// Other conversions may be added in future, but this should suffice for most
 /// cases. Any of these types may be passed to the insertion methods on a cache
 /// type when adding entries to a cache.
+#[derive(Debug)]
 pub struct CacheExpiration {
     instant: Instant,
 }
