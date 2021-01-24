@@ -125,58 +125,81 @@ where
     /// cache storing expired entries (assuming the monitor just ran), so make sure
     /// to tune your frequency, sample size, and threshold accordingly.
     pub async fn monitor(&self, sample: usize, threshold: f64, frequency: Duration) {
+        // construct our timer based on the provided frequency
         let mut interval = Interval::platform_new(frequency);
 
         loop {
+            // wait until the next timer tick
             interval.as_mut().await;
 
+            // lock the store and grab a generator
             let mut store = self.store.write().await;
             let mut rng = rand::thread_rng();
 
             loop {
+                // once we're empty, no point carrying on
                 if store.is_empty() {
                     break;
                 }
 
-                let count = cmp::min(sample, store.len());
+                // determine the sample size of the batch
+                let total = store.len();
+                let sample = cmp::min(sample, total);
 
+                // counter to track removed keys
                 let mut gone = 0f64;
-                let mut keys = Vec::with_capacity(count);
+
+                // create our temporary key store and index tree
+                let mut keys = Vec::with_capacity(sample);
                 let mut indices: BTreeSet<usize> = BTreeSet::new();
 
-                while indices.len() < count {
-                    indices.insert(rng.gen_range(0..store.len()));
+                // fetch `sample` keys at random
+                while indices.len() < sample {
+                    indices.insert(rng.gen_range(0..total));
                 }
 
                 {
+                    // tracker for previous index
                     let mut prev = 0;
+
+                    // boxed iterator to allow us to iterate a single time for all indices
                     let mut iter: Box<dyn Iterator<Item = (&K, &CacheEntry<V>)>> =
                         Box::new(store.iter());
 
+                    // walk our index list
                     for idx in indices {
+                        // calculate how much we need to shift the iterator
                         let offset = idx
                             .checked_sub(prev)
                             .and_then(|idx| idx.checked_sub(1))
                             .unwrap_or(0);
 
+                        // shift and mark the current index
                         iter = Box::new(iter.skip(offset));
                         prev = idx;
 
+                        // fetch the next pair (at our index)
                         let (key, entry) = iter.next().unwrap();
 
+                        // skip if not expired
                         if !entry.is_expired() {
                             continue;
                         }
 
+                        // otherwise mark for removal
                         keys.push(key.to_owned());
+
+                        // and increment remove count
                         gone += 1.0;
                     }
                 }
 
+                // remove all expired keys
                 for key in &keys {
                     store.remove(key);
                 }
 
+                // break the loop if we don't meet thresholds
                 if gone < (sample as f64 * threshold) {
                     break;
                 }
