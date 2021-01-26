@@ -128,7 +128,7 @@ where
     /// This means that at any point you may have up to `threshold` percent of your
     /// cache storing expired entries (assuming the monitor just ran), so make sure
     /// to tune your frequency, sample size, and threshold accordingly.
-    pub async fn monitor(&self, sample: usize, threshold: f64, frequency: Duration) {
+    pub async fn monitor(&self, sample: usize, frequency: Duration, threshold: f64) {
         // construct our timer based on the provided frequency
         let mut interval = Interval::platform_new(frequency);
 
