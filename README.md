@@ -12,6 +12,9 @@ perform cleanup tasks periodically. The eviction algorithm is similar to the one
 found inside [Redis](https://redis.io/commands/expire), although keys are not
 removed on access in order to reduce borrow complexity.
 
+This crate is still a work in progress, so feel free to file any suggestions or
+improvements and I'll get to them as soon as possible :).
+
 ### Getting Started
 
 This crate is available on [crates.io](https://crates.io/crates/async-cache). The
