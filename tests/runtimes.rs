@@ -14,7 +14,7 @@ async fn test_async_std() {
     // spawn the monitor
     task::spawn(async move {
         // don't forget to monitor your cache to evict entries
-        clone.monitor(25, 0.25, Duration::from_secs(1)).await
+        clone.monitor(25, Duration::from_secs(1), 0.25).await
     });
 
     // execute the set of base tests
@@ -31,7 +31,7 @@ fn test_smol() {
         // spawn the monitor
         let handle = smol::spawn(async move {
             // don't forget to monitor your cache to evict entries
-            clone.monitor(25, 0.25, Duration::from_secs(1)).await
+            clone.monitor(25, Duration::from_secs(1), 0.25).await
         });
 
         // execute the set of base tests
@@ -51,7 +51,7 @@ async fn test_tokio() {
     // spawn the monitor
     let monitor = tokio::spawn(async move {
         // don't forget to monitor your cache to evict entries
-        clone.monitor(3, 0.25, Duration::from_secs(3)).await
+        clone.monitor(3, Duration::from_secs(3), 0.25).await
     });
 
     // execute the set of base tests
