@@ -1,12 +1,12 @@
-# async-cache
-[![Build Status](https://img.shields.io/travis/whitfin/async-cache.svg)](https://travis-ci.org/whitfin/async-cache.rs)
-[![Crates.io](https://img.shields.io/crates/v/async-cache.svg)](https://crates.io/crates/async-cache.rs)
+# Retainer
+[![Build Status](https://img.shields.io/travis/whitfin/retainer.svg)](https://travis-ci.org/whitfin/retainer)
+[![Crates.io](https://img.shields.io/crates/v/retainer.svg)](https://crates.io/crates/retainer)
 
 This crate offers a very small cache with asynchronous bindings, allowing it to be
-used in async contexts (Tokio, async-std, smol, etc.) without blocking the worker
-thread.
+used in async Rust contexts (Tokio, async-std, smol, etc.) without blocking the
+worker thread completely.
 
-Also offered is the ability to expire entries in the cache based on their time
+It also includes the ability to expire entries in the cache based on their time
 inside; this is done by spawning a monitor on your async runtime in order to
 perform cleanup tasks periodically. The eviction algorithm is similar to the one
 found inside [Redis](https://redis.io/commands/expire), although keys are not
@@ -17,12 +17,12 @@ improvements and I'll get to them as soon as possible :).
 
 ### Getting Started
 
-This crate is available on [crates.io](https://crates.io/crates/async-cache). The
+This crate is available on [crates.io](https://crates.io/crates/retainer). The
 easiest way to use it is to add an entry to your `Cargo.toml` defining the dependency:
 
 ```toml
 [dependencies]
-async-cache = "0.1"
+retainer = "0.1"
 ```
 
 ### Basic Usage
@@ -39,7 +39,7 @@ be compatible with most of the popular asynchronous runtimes. Currently a small
 set of tests are run against async-std, smol and Tokio.
 
 ```rust
-use async_cache::Cache;
+use retainer::Cache;
 use tokio::time::sleep;
 
 use std::sync::Arc;

@@ -1,9 +1,9 @@
 [package]
-name = "async-cache"
+name = "retainer"
 version = "0.1.0" # remember to update html_root_url
 authors = ["Isaac Whitfield <iw@whitfin.io>"]
 description = "Minimal async cache in Rust with support for key expirations "
-repository = "https://github.com/whitfin/async-cache.rs"
+repository = "https://github.com/whitfin/retainer"
 keywords = ["async", "futures", "caching", "expiration", "ttl"]
 categories = ["algorithms", "asynchronous", "caching", "data-structures"]
 readme = "README.md"

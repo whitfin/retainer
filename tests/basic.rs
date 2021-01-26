@@ -1,4 +1,4 @@
-use async_cache::Cache;
+use retainer::Cache;
 
 #[tokio::test]
 async fn test_cache_size_operations() {
