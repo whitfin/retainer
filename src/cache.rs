@@ -10,13 +10,14 @@
 //! on how this works can be seen on the `monitor` method of the `Cache` type.
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
+use std::marker::PhantomData;
 use std::time::Duration;
 
+use async_lock::RwLock;
 use async_timer::Interval;
 use rand::prelude::*;
-use tokio::sync::{RwLock, RwLockReadGuard};
 
-use crate::entry::{CacheEntry, CacheExpiration};
+use crate::entry::{CacheEntry, CacheEntryReadGuard, CacheExpiration};
 
 // Define small private macro to unpack entry references.
 macro_rules! unpack {
@@ -70,10 +71,13 @@ where
     /// Retrieve a reference to a value inside the cache.
     ///
     /// The returned reference is bound inside a `RwLockReadGuard`.
-    pub async fn get(&self, k: &K) -> Option<RwLockReadGuard<'_, CacheEntry<V>>> {
+    pub async fn get(&self, k: &K) -> Option<CacheEntryReadGuard<'_, V>> {
         let guard = self.store.read().await;
-        let guard = RwLockReadGuard::try_map(guard, |guard| unpack!(guard.get(k)?));
-        guard.ok()
+
+        unpack!(guard.get(k)?).map(|entry| CacheEntryReadGuard {
+            entry,
+            marker: PhantomData,
+        })
     }
 
     /// Retrieve the number of entries inside the cache.

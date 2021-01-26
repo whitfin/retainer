@@ -1,9 +1,9 @@
 [package]
-name = "async_cache"
+name = "async-cache"
 version = "0.1.0" # remember to update html_root_url
 authors = ["Isaac Whitfield <iw@whitfin.io>"]
 description = "Minimal async cache in Rust with support for key expirations "
-repository = "https://github.com/whitfin/async_cache"
+repository = "https://github.com/whitfin/async-cache"
 keywords = ["async", "futures", "caching", "expiration", "ttl"]
 categories = ["algorithms", "asynchronous", "caching", "data-structures"]
 readme = "README.md"
@@ -12,10 +12,10 @@ license = "MIT"
 
 [dependencies]
 rand = "0.8"
+async-lock = "2.3"
 async-timer = "0.7"
-tokio = { version = "1.1", features = ["sync"] }
 
 [dev-dependencies]
-async-std = { version = "1.9", features = ["attributes"] }
 smol = "1.2"
 tokio = { version = "1.1", features = ["full"] }
+async-std = { version = "1.9", features = ["attributes"] }

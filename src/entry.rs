@@ -3,6 +3,7 @@
 //! Each entry has an associated value and optional expiration,
 //! and access functions for both. To be more convenient to the
 //! called, a `CacheEntry<V>` will also dereference to `V`.
+use std::marker::PhantomData;
 use std::ops::Range;
 use std::ops::{Deref, DerefMut};
 use std::time::{Duration, Instant};
@@ -120,5 +121,25 @@ impl From<Duration> for CacheExpiration {
 impl From<Range<u64>> for CacheExpiration {
     fn from(range: Range<u64>) -> Self {
         rand::thread_rng().gen_range(range).into()
+    }
+}
+
+/// Read guard for references to the inner cache structure.
+///
+/// This structure is required to return references to the inner cache entries
+/// when using locking mechanisms. This structure should be transparent for the
+/// most part as it implements `Deref` to convert itself into the inner value.
+#[derive(Debug)]
+pub struct CacheEntryReadGuard<'a, V> {
+    pub(crate) entry: *const CacheEntry<V>,
+    pub(crate) marker: PhantomData<&'a CacheEntry<V>>,
+}
+
+impl<'a, V> Deref for CacheEntryReadGuard<'a, V> {
+    type Target = V;
+
+    // Derefs a cache guard to the internal entry.
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.entry }
     }
 }
