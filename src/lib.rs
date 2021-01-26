@@ -2,7 +2,7 @@
 //!
 //! All interaction in this crate will be done through the `Cache` type,
 //! so please see the the `cache` module for further instructions.
-#![doc(html_root_url = "https://docs.rs/async-cache/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/retainer/0.1.0")]
 
 // exposed modules
 pub mod cache;
