@@ -49,7 +49,7 @@ async fn main() {
     let clone = cache.clone();
 
     // don't forget to monitor your cache to evict entries
-    tokio::spawn(async move {
+    let monitor = tokio::spawn(async move {
         clone.monitor(4, 0.25, Duration::from_secs(3)).await
     });
 
@@ -96,6 +96,9 @@ async fn main() {
 
     // and now our cache should be empty
     assert!(cache.is_empty().await);
+
+    // shutdown monitor
+    monitor.abort();
 }
 
 ```
