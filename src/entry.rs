@@ -143,3 +143,7 @@ impl<'a, V> Deref for CacheEntryReadGuard<'a, V> {
         unsafe { &*self.entry }
     }
 }
+
+// Stores a raw pointer to `T`, so if `T` is `Sync`, the lock guard over `T` is `Send`.
+unsafe impl<V> Send for CacheEntryReadGuard<'_, V> where V: Sized + Sync {}
+unsafe impl<V> Sync for CacheEntryReadGuard<'_, V> where V: Sized + Send + Sync {}
