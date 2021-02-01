@@ -116,6 +116,17 @@ where
     /// This future must be spawned on whatever runtime you are using inside your
     /// application; not doing this will result in keys never being expired.
     ///
+    /// For expiration logic, please see `Cache::purge`, as this is used under the hood.
+    pub async fn monitor(&self, sample: usize, threshold: f64, frequency: Duration) {
+        let mut interval = Interval::platform_new(frequency);
+        loop {
+            interval.as_mut().await;
+            self.purge(sample, threshold).await;
+        }
+    }
+
+    /// Cleanses the cache of expired entries.
+    ///
     /// Keys are expired using the same logic as the popular caching system Redis:
     ///
     /// 1. Wait until the next tick of `frequency`.
@@ -128,85 +139,77 @@ where
     /// This means that at any point you may have up to `threshold` percent of your
     /// cache storing expired entries (assuming the monitor just ran), so make sure
     /// to tune your frequency, sample size, and threshold accordingly.
-    pub async fn monitor(&self, sample: usize, frequency: Duration, threshold: f64) {
-        // construct our timer based on the provided frequency
-        let mut interval = Interval::platform_new(frequency);
+    pub async fn purge(&self, sample: usize, threshold: f64) {
+        // lock the store and grab a generator
+        let mut store = self.store.write().await;
+        let mut rng = rand::thread_rng();
 
         loop {
-            // wait until the next timer tick
-            interval.as_mut().await;
+            // once we're empty, no point carrying on
+            if store.is_empty() {
+                return;
+            }
 
-            // lock the store and grab a generator
-            let mut store = self.store.write().await;
-            let mut rng = rand::thread_rng();
+            // determine the sample size of the batch
+            let total = store.len();
+            let sample = cmp::min(sample, total);
 
-            loop {
-                // once we're empty, no point carrying on
-                if store.is_empty() {
-                    break;
-                }
+            // counter to track removed keys
+            let mut gone = 0f64;
 
-                // determine the sample size of the batch
-                let total = store.len();
-                let sample = cmp::min(sample, total);
+            // create our temporary key store and index tree
+            let mut keys = Vec::with_capacity(sample);
+            let mut indices: BTreeSet<usize> = BTreeSet::new();
 
-                // counter to track removed keys
-                let mut gone = 0f64;
+            // fetch `sample` keys at random
+            while indices.len() < sample {
+                indices.insert(rng.gen_range(0..total));
+            }
 
-                // create our temporary key store and index tree
-                let mut keys = Vec::with_capacity(sample);
-                let mut indices: BTreeSet<usize> = BTreeSet::new();
+            {
+                // tracker for previous index
+                let mut prev = 0;
 
-                // fetch `sample` keys at random
-                while indices.len() < sample {
-                    indices.insert(rng.gen_range(0..total));
-                }
+                // boxed iterator to allow us to iterate a single time for all indices
+                let mut iter: Box<dyn Iterator<Item = (&K, &CacheEntry<V>)>> =
+                    Box::new(store.iter());
 
-                {
-                    // tracker for previous index
-                    let mut prev = 0;
+                // walk our index list
+                for idx in indices {
+                    // calculate how much we need to shift the iterator
+                    let offset = idx
+                        .checked_sub(prev)
+                        .and_then(|idx| idx.checked_sub(1))
+                        .unwrap_or(0);
 
-                    // boxed iterator to allow us to iterate a single time for all indices
-                    let mut iter: Box<dyn Iterator<Item = (&K, &CacheEntry<V>)>> =
-                        Box::new(store.iter());
+                    // shift and mark the current index
+                    iter = Box::new(iter.skip(offset));
+                    prev = idx;
 
-                    // walk our index list
-                    for idx in indices {
-                        // calculate how much we need to shift the iterator
-                        let offset = idx
-                            .checked_sub(prev)
-                            .and_then(|idx| idx.checked_sub(1))
-                            .unwrap_or(0);
+                    // fetch the next pair (at our index)
+                    let (key, entry) = iter.next().unwrap();
 
-                        // shift and mark the current index
-                        iter = Box::new(iter.skip(offset));
-                        prev = idx;
-
-                        // fetch the next pair (at our index)
-                        let (key, entry) = iter.next().unwrap();
-
-                        // skip if not expired
-                        if !entry.is_expired() {
-                            continue;
-                        }
-
-                        // otherwise mark for removal
-                        keys.push(key.to_owned());
-
-                        // and increment remove count
-                        gone += 1.0;
+                    // skip if not expired
+                    if !entry.is_expired() {
+                        continue;
                     }
-                }
 
-                // remove all expired keys
-                for key in &keys {
-                    store.remove(key);
-                }
+                    // otherwise mark for removal
+                    keys.push(key.to_owned());
 
-                // break the loop if we don't meet thresholds
-                if gone < (sample as f64 * threshold) {
-                    break;
+                    // and increment remove count
+                    gone += 1.0;
                 }
+            }
+
+            // remove all expired keys
+            for key in &keys {
+                store.remove(key);
+            }
+
+            // break the loop if we don't meet thresholds
+            if gone < (sample as f64 * threshold) {
+                return;
             }
         }
     }
