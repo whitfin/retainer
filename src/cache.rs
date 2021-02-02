@@ -11,10 +11,11 @@
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
 use std::marker::PhantomData;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use async_lock::{RwLock, RwLockUpgradableReadGuard};
 use async_timer::Interval;
+use log::{debug, log_enabled, trace, Level};
 use rand::prelude::*;
 
 use crate::entry::{CacheEntry, CacheEntryReadGuard, CacheExpiration};
@@ -140,6 +141,9 @@ where
     /// cache storing expired entries (assuming the monitor just ran), so make sure
     /// to tune your frequency, sample size, and threshold accordingly.
     pub async fn purge(&self, sample: usize, threshold: f64) {
+        let now = Instant::now();
+        let mut removed = 0;
+
         loop {
             // lock the store and grab a generator
             let store = self.store.upgradable_read().await;
@@ -154,7 +158,7 @@ where
             let sample = cmp::min(sample, total);
 
             // counter to track removed keys
-            let mut gone = 0f64;
+            let mut gone = 0;
 
             // create our temporary key store and index tree
             let mut keys = Vec::with_capacity(sample);
@@ -200,7 +204,7 @@ where
                     keys.push(key.to_owned());
 
                     // and increment remove count
-                    gone += 1.0;
+                    gone += 1;
                 }
             }
 
@@ -214,11 +218,31 @@ where
                 }
             }
 
+            // log out now many of the sampled keys were removed
+            if log_enabled!(Level::Trace) {
+                trace!(
+                    "Removed {} / {} ({:.2}%) of the sampled keys",
+                    gone,
+                    sample,
+                    (gone as f64 / sample as f64) * 100f64,
+                );
+            }
+
+            // bump total remove count
+            removed += gone;
+
             // break the loop if we don't meet thresholds
-            if gone < (sample as f64 * threshold) {
+            if (gone as f64) < (sample as f64 * threshold) {
                 break;
             }
         }
+
+        // log out the completion as well as the time taken in millis
+        debug!(
+            "Purge loop removed {} entries in {}ms",
+            removed,
+            now.elapsed().as_millis()
+        );
     }
 
     /// Remove an entry from the cache and return any stored value.
