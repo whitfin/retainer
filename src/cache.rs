@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use async_lock::RwLock;
+use async_lock::{RwLock, RwLockUpgradableReadGuard};
 use async_timer::Interval;
 use rand::prelude::*;
 
@@ -140,14 +140,13 @@ where
     /// cache storing expired entries (assuming the monitor just ran), so make sure
     /// to tune your frequency, sample size, and threshold accordingly.
     pub async fn purge(&self, sample: usize, threshold: f64) {
-        // lock the store and grab a generator
-        let mut store = self.store.write().await;
-        let mut rng = rand::thread_rng();
-
         loop {
+            // lock the store and grab a generator
+            let store = self.store.upgradable_read().await;
+
             // once we're empty, no point carrying on
             if store.is_empty() {
-                return;
+                break;
             }
 
             // determine the sample size of the batch
@@ -161,9 +160,12 @@ where
             let mut keys = Vec::with_capacity(sample);
             let mut indices: BTreeSet<usize> = BTreeSet::new();
 
-            // fetch `sample` keys at random
-            while indices.len() < sample {
-                indices.insert(rng.gen_range(0..total));
+            {
+                // fetch `sample` keys at random
+                let mut rng = rand::thread_rng();
+                while indices.len() < sample {
+                    indices.insert(rng.gen_range(0..total));
+                }
             }
 
             {
@@ -202,14 +204,19 @@ where
                 }
             }
 
-            // remove all expired keys
-            for key in &keys {
-                store.remove(key);
+            {
+                // upgrade to a write guard so that we can make our changes
+                let mut store = RwLockUpgradableReadGuard::upgrade(store).await;
+
+                // remove all expired keys
+                for key in &keys {
+                    store.remove(key);
+                }
             }
 
             // break the loop if we don't meet thresholds
             if gone < (sample as f64 * threshold) {
-                return;
+                break;
             }
         }
     }
