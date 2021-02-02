@@ -132,3 +132,9 @@ Below is a summarization of the flow of eviction, hopefully in a clear way:
 This allows the user to control the aggressiveness of eviction quite effectively,
 by tweaking the `threshold` and `frequency` values. Naturally a cache uses more
 memory on average the higher your threshold is, so please do keep this in mind.
+
+### Cache Logging
+
+As of v0.2, minimal logging is included using the [log](https://crates.io/crates/log)
+crate. You can attach any of the compatible logging backends to see what is happening
+in the cache (particularly the eviction loop) to better gauge your usage and parameters.
