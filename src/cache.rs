@@ -54,7 +54,7 @@ where
     }
 
     /// Sets the label inside this cache for logging purposes.
-    pub fn with_label(&mut self, s: &str) -> &mut Self {
+    pub fn with_label(mut self, s: &str) -> Self {
         self.label = format!("cache({}): ", s);
         self
     }
