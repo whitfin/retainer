@@ -13,6 +13,7 @@ license = "MIT"
 [dependencies]
 log = "0.4"
 rand = "0.8"
+humantime = "2.1"
 async-lock = "2.3"
 async-timer = "0.7"
 

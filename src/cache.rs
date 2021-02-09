@@ -149,9 +149,9 @@ where
     /// cache storing expired entries (assuming the monitor just ran), so make sure
     /// to tune your frequency, sample size, and threshold accordingly.
     pub async fn purge(&self, sample: usize, threshold: f64) {
-        let started = Instant::now();
+        let start = Instant::now();
+        let locked = Duration::from_nanos(0);
 
-        let mut locked = 0;
         let mut removed = 0;
 
         loop {
@@ -228,8 +228,8 @@ where
                     store.remove(key);
                 }
 
-                // increment the lock timer in millis
-                locked += acquired.elapsed().as_millis();
+                // increment the lock timer tracking directly
+                locked.checked_add(acquired.elapsed()).unwrap();
             }
 
             // log out now many of the sampled keys were removed
@@ -254,11 +254,11 @@ where
 
         // log out the completion as well as the time taken in millis
         debug!(
-            "{}purge loop removed {} entries in {}ms ({}ms locked)",
+            "{}purge loop removed {} entries in {} ({} locked)",
             self.label,
             removed,
-            started.elapsed().as_millis(),
-            locked
+            humantime::format_duration(start.elapsed()),
+            humantime::format_duration(locked)
         );
     }
 
