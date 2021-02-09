@@ -255,11 +255,11 @@ where
         // log out the completion as well as the time taken in millis
         if log_enabled!(Level::Debug) {
             debug!(
-                "{}purge loop removed {} entries in {}μs ({}μs locked)",
+                "{}purge loop removed {} entries in {:.2?} ({:.2?} locked)",
                 self.label,
                 removed,
-                start.elapsed().as_micros(),
-                locked.as_micros()
+                start.elapsed(),
+                locked
             );
         }
     }
