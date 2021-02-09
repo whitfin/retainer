@@ -150,8 +150,8 @@ where
     /// to tune your frequency, sample size, and threshold accordingly.
     pub async fn purge(&self, sample: usize, threshold: f64) {
         let start = Instant::now();
-        let locked = Duration::from_nanos(0);
 
+        let mut locked = Duration::from_nanos(0);
         let mut removed = 0;
 
         loop {
@@ -229,7 +229,7 @@ where
                 }
 
                 // increment the lock timer tracking directly
-                locked.checked_add(acquired.elapsed()).unwrap();
+                locked = locked.checked_add(acquired.elapsed()).unwrap();
             }
 
             // log out now many of the sampled keys were removed
@@ -255,11 +255,11 @@ where
         // log out the completion as well as the time taken in millis
         if log_enabled!(Level::Debug) {
             debug!(
-                "{}purge loop removed {} entries in {} ({} locked)",
+                "{}purge loop removed {} entries in {}μs ({}μs locked)",
                 self.label,
                 removed,
-                humantime::format_duration(start.elapsed()),
-                humantime::format_duration(locked)
+                start.elapsed().as_micros(),
+                locked.as_micros()
             );
         }
     }
