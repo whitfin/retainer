@@ -253,13 +253,15 @@ where
         }
 
         // log out the completion as well as the time taken in millis
-        debug!(
-            "{}purge loop removed {} entries in {} ({} locked)",
-            self.label,
-            removed,
-            humantime::format_duration(start.elapsed()),
-            humantime::format_duration(locked)
-        );
+        if log_enabled!(Level::Debug) {
+            debug!(
+                "{}purge loop removed {} entries in {} ({} locked)",
+                self.label,
+                removed,
+                humantime::format_duration(start.elapsed()),
+                humantime::format_duration(locked)
+            );
+        }
     }
 
     /// Remove an entry from the cache and return any stored value.
