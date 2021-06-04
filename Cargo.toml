@@ -11,13 +11,13 @@ edition = "2018"
 license = "MIT"
 
 [dependencies]
-log = "0.4"
-rand = "0.8"
-async-lock = "2.3"
-async-timer = "0.7"
+log = "0.4.14"
+rand = "0.8.3"
+async-lock = "2.4.0"
+async-timer = "0.7.4"
 
 [dev-dependencies]
-smol = "1.2"
-tokio = { version = "1.4", features = ["full"] }
-async-std = { version = "1.9", features = ["attributes"] }
-simple_logger = "1.11"
+smol = "1.2.5"
+tokio = { version = "1.6.1", features = ["full"] }
+async-std = { version = "1.9.0", features = ["attributes"] }
+simple_logger = "1.11.0"
