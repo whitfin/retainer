@@ -38,7 +38,6 @@ macro_rules! unpack {
 /// handle - which is what would happen with standard locking implementations.
 pub struct Cache<K, V> {
   store: RwLock<BTreeMap<K, CacheEntry<V>>>,
-  label: String,
 }
 
 impl<K, V> Cache<K, V>
@@ -49,14 +48,7 @@ where
   pub fn new() -> Self {
     Self {
       store: RwLock::new(BTreeMap::new()),
-      label: "".to_owned(),
     }
-  }
-
-  /// Sets the label inside this cache for logging purposes.
-  pub fn with_label(mut self, s: &str) -> Self {
-    self.label = format!("cache({}): ", s);
-    self
   }
 
   /// Remove all entries from the cache.
@@ -246,8 +238,7 @@ where
       // log out now many of the sampled keys were removed
       if log_enabled!(Level::Trace) {
         trace!(
-          "{}removed {} / {} ({:.2}%) of the sampled keys",
-          self.label,
+          "removed {} / {} ({:.2}%) of the sampled keys",
           gone,
           sample,
           (gone as f64 / sample as f64) * 100f64,
@@ -266,8 +257,7 @@ where
     // log out the completion as well as the time taken in millis
     if log_enabled!(Level::Debug) {
       debug!(
-        "{}purge loop removed {} entries in {:.0?} ({:.0?} locked)",
-        self.label,
+        "purge loop removed {} entries in {:.0?} ({:.0?} locked)",
         removed,
         start.elapsed(),
         locked
