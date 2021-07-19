@@ -138,7 +138,7 @@ where
   /// application; not doing this will result in keys never being expired.
   ///
   /// For expiration logic, please see `Cache::purge`, as this is used under the hood.
-  pub async fn monitor(&self, sample: usize, threshold: f64, frequency: Duration) {
+  pub async fn monitor(&self, sample: usize, threshold: usize, frequency: Duration) {
     let mut interval = Interval::platform_new(frequency);
     loop {
       interval.as_mut().await;
@@ -160,7 +160,7 @@ where
   /// This means that at any point you may have up to `threshold` percent of your
   /// cache storing expired entries (assuming the monitor just ran), so make sure
   /// to tune your frequency, sample size, and threshold accordingly.
-  pub async fn purge(&self, sample: usize, threshold: f64) {
+  pub async fn purge(&self, sample: usize, threshold: usize) {
     let start = Instant::now();
 
     let mut locked = Duration::from_nanos(0);
@@ -258,7 +258,7 @@ where
       removed += gone;
 
       // break the loop if we don't meet thresholds
-      if (gone as f64) < (sample as f64 * threshold) {
+      if gone < threshold {
         break;
       }
     }
