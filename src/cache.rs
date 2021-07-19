@@ -42,7 +42,7 @@ pub struct Cache<K, V> {
 
 impl<K, V> Cache<K, V>
 where
-  K: Ord + Clone,
+  K: Ord + Clone + std::fmt::Debug,
 {
   /// Construct a new `Cache`.
   pub fn new() -> Self {
@@ -130,11 +130,17 @@ where
   /// application; not doing this will result in keys never being expired.
   ///
   /// For expiration logic, please see `Cache::purge`, as this is used under the hood.
-  pub async fn monitor(&self, sample: usize, threshold: usize, frequency: Duration) {
+  pub async fn monitor(
+    &self,
+    sample: usize,
+    threshold: usize,
+    frequency: Duration,
+    on_expire: &dyn Fn(&Vec<K>),
+  ) {
     let mut interval = Interval::platform_new(frequency);
     loop {
       interval.as_mut().await;
-      self.purge(sample, threshold).await;
+      self.purge(sample, threshold, on_expire).await;
     }
   }
 
@@ -152,7 +158,7 @@ where
   /// This means that at any point you may have up to `threshold` percent of your
   /// cache storing expired entries (assuming the monitor just ran), so make sure
   /// to tune your frequency, sample size, and threshold accordingly.
-  pub async fn purge(&self, sample: usize, threshold: usize) {
+  pub async fn purge(&self, sample: usize, threshold: usize, on_expire: &dyn Fn(&Vec<K>)) {
     let start = Instant::now();
 
     let mut locked = Duration::from_nanos(0);
@@ -185,7 +191,6 @@ where
           indices.insert(rng.gen_range(0..total));
         }
       }
-
       {
         // tracker for previous index
         let mut prev = 0;
@@ -220,6 +225,12 @@ where
           gone += 1;
         }
       }
+
+      if keys.len() == 0 {
+        return;
+      }
+
+      on_expire(&keys);
 
       {
         // upgrade to a write guard so that we can make our changes
@@ -321,7 +332,7 @@ where
 /// Default implementation.
 impl<K, V> Default for Cache<K, V>
 where
-  K: Ord + Clone,
+  K: Ord + Clone + std::fmt::Debug,
 {
   fn default() -> Self {
     Cache::new()
