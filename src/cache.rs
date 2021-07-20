@@ -135,7 +135,7 @@ where
     sample: usize,
     threshold: usize,
     frequency: Duration,
-    on_expire: &dyn Fn(&K, &CacheEntry<V>),
+    on_expire: &dyn Fn(Vec<(&K, &CacheEntry<V>)>),
   ) {
     let mut interval = Interval::platform_new(frequency);
     loop {
@@ -162,7 +162,7 @@ where
     &self,
     sample: usize,
     threshold: usize,
-    on_expire: &dyn Fn(&K, &CacheEntry<V>),
+    on_expire: &dyn Fn(Vec<(&K, &CacheEntry<V>)>),
   ) {
     let start = Instant::now();
 
@@ -203,6 +203,8 @@ where
         // boxed iterator to allow us to iterate a single time for all indices
         let mut iter: Box<dyn Iterator<Item = (&K, &CacheEntry<V>)>> = Box::new(store.iter());
 
+        let mut expired = Vec::with_capacity(sample);
+
         // walk our index list
         for idx in indices {
           // calculate how much we need to shift the iterator
@@ -225,11 +227,14 @@ where
 
           // otherwise mark for removal
           keys.push(key.to_owned());
-          on_expire(key, entry);
+
+          expired.push((key, entry));
 
           // and increment remove count
           gone += 1;
         }
+
+        on_expire(expired);
       }
 
       if keys.len() == 0 {
