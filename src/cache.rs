@@ -135,7 +135,7 @@ where
     sample: usize,
     threshold: usize,
     frequency: Duration,
-    on_expire: &dyn Fn(&Vec<K>),
+    on_expire: &dyn Fn(&K, &CacheEntry<V>),
   ) {
     let mut interval = Interval::platform_new(frequency);
     loop {
@@ -158,7 +158,12 @@ where
   /// This means that at any point you may have up to `threshold` percent of your
   /// cache storing expired entries (assuming the monitor just ran), so make sure
   /// to tune your frequency, sample size, and threshold accordingly.
-  pub async fn purge(&self, sample: usize, threshold: usize, on_expire: &dyn Fn(&Vec<K>)) {
+  pub async fn purge(
+    &self,
+    sample: usize,
+    threshold: usize,
+    on_expire: &dyn Fn(&K, &CacheEntry<V>),
+  ) {
     let start = Instant::now();
 
     let mut locked = Duration::from_nanos(0);
@@ -220,6 +225,7 @@ where
 
           // otherwise mark for removal
           keys.push(key.to_owned());
+          on_expire(key, entry);
 
           // and increment remove count
           gone += 1;
@@ -229,8 +235,6 @@ where
       if keys.len() == 0 {
         return;
       }
-
-      on_expire(&keys);
 
       {
         // upgrade to a write guard so that we can make our changes
