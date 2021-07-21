@@ -25,7 +25,11 @@ async fn test_cache_update_operations() {
 
     cache.insert_untracked(1, 1).await;
 
+    // Direct value access
     assert_eq!(*cache.get(&1).await.unwrap(), 1);
+    // Entry info access
+    assert_eq!(cache.get(&1).await.unwrap().entry().is_expired(), false);
+    assert_eq!(cache.get(&1).await.unwrap().entry().value(), &1);
 
     cache
         .update(&1, |value| {
@@ -33,5 +37,9 @@ async fn test_cache_update_operations() {
         })
         .await;
 
+    // Direct value access
     assert_eq!(*cache.get(&1).await.unwrap(), 5);
+    // Entry info access
+    assert_eq!(cache.get(&1).await.unwrap().entry().is_expired(), false);
+    assert_eq!(cache.get(&1).await.unwrap().entry().value(), &5);
 }

@@ -135,6 +135,13 @@ pub struct CacheEntryReadGuard<'a, V> {
     pub(crate) marker: PhantomData<&'a CacheEntry<V>>,
 }
 
+impl<'a, V> CacheEntryReadGuard<'a, V> {
+    /// Retrieve the entry value and its associated expiration.
+    pub fn entry(&self) -> &CacheEntry<V> {
+        unsafe { &*self.entry }
+    }
+}
+
 impl<'a, V> Deref for CacheEntryReadGuard<'a, V> {
     type Target = V;
 
