@@ -94,6 +94,10 @@ impl CacheExpiration {
   pub fn remaining(&self) -> Duration {
     self.instant.saturating_duration_since(Instant::now())
   }
+
+  pub fn renew(&mut self, duration: Duration) {
+    self.instant += duration;
+  }
 }
 
 // Automatic conversation from `Instant`.
