@@ -81,6 +81,19 @@ where
     }
   }
 
+  pub async fn renew(&self, k: &K, duration: Duration) -> bool {
+    match self.store.write().await.get_mut(k) {
+      Some(entry) => match &mut entry.expiration {
+        Some(expiration) => {
+          expiration.renew(duration);
+          true
+        }
+        None => true,
+      },
+      None => false,
+    }
+  }
+
   /// Retrieve a reference to a value inside the cache.
   ///
   /// The returned reference is bound inside a `RwLockReadGuard`.
