@@ -81,6 +81,23 @@ where
     }
   }
 
+  pub async fn get_renew(&self, k: &K, duration: Duration) -> Option<CacheEntryReadGuard<'_, V>> {
+    match self.store.write().await.get_mut(k) {
+      Some(entry) => match &mut entry.expiration {
+        Some(expiration) => {
+          expiration.renew(duration);
+          Some(entry)
+        }
+        None => Some(entry),
+      },
+      None => None,
+    }
+    .map(|entry| CacheEntryReadGuard {
+      entry,
+      marker: PhantomData,
+    })
+  }
+
   pub async fn renew(&self, k: &K, duration: Duration) -> bool {
     match self.store.write().await.get_mut(k) {
       Some(entry) => match &mut entry.expiration {
