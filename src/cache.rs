@@ -73,23 +73,18 @@ where
   /// Retrieve a key expiration from cache.
   pub async fn expiration(&self, k: &K) -> Option<Instant> {
     match self.store.read().await.get(k) {
-      Some(entry) => match &entry.expiration {
-        Some(expiration) => Some(*expiration.instant()),
-        None => None,
-      },
+      Some(entry) => Some(*entry.expiration.instant()),
       None => None,
     }
   }
 
   pub async fn get_renew(&self, k: &K, duration: Duration) -> Option<CacheEntryReadGuard<'_, V>> {
     match self.store.write().await.get_mut(k) {
-      Some(entry) => match &mut entry.expiration {
-        Some(expiration) => {
-          expiration.renew(duration);
-          Some(entry)
-        }
-        None => Some(entry),
-      },
+      Some(entry) => {
+        let expiration = &mut entry.expiration;
+        expiration.renew(duration);
+        Some(entry)
+      }
       None => None,
     }
     .map(|entry| CacheEntryReadGuard {
@@ -100,13 +95,10 @@ where
 
   pub async fn renew(&self, k: &K, duration: Duration) -> bool {
     match self.store.write().await.get_mut(k) {
-      Some(entry) => match &mut entry.expiration {
-        Some(expiration) => {
-          expiration.renew(duration);
-          true
-        }
-        None => true,
-      },
+      Some(entry) => {
+        entry.expiration.renew(duration);
+        true
+      }
       None => false,
     }
   }
@@ -141,12 +133,7 @@ where
   where
     E: Into<CacheExpiration>,
   {
-    self.do_insert(k, v, Some(e.into())).await
-  }
-
-  /// Insert a key/value pair into the cache with no associated expiration.
-  pub async fn insert_untracked(&self, k: K, v: V) -> Option<CacheEntry<V>> {
-    self.do_insert(k, v, None).await
+    self.do_insert(k, v, e.into()).await
   }
 
   /// Check whether the cache is empty.
@@ -353,7 +340,7 @@ where
   /// Internal logic for insertion to avoid multiple definitions.
   ///
   /// This is necessary as we have to support storing keys with not attached expiration.
-  async fn do_insert(&self, k: K, v: V, e: Option<CacheExpiration>) -> Option<CacheEntry<V>> {
+  async fn do_insert(&self, k: K, v: V, e: CacheExpiration) -> Option<CacheEntry<V>> {
     let entry = CacheEntry {
       value: v,
       expiration: e,

@@ -17,21 +17,20 @@ use rand::prelude::*;
 #[derive(Debug)]
 pub struct CacheEntry<V> {
   pub(crate) value: V,
-  pub(crate) expiration: Option<CacheExpiration>,
+  pub(crate) expiration: CacheExpiration,
 }
 
 impl<V> CacheEntry<V> {
   /// Retrieve the expiration associated with a cache entry.
-  pub fn expiration(&self) -> Option<&CacheExpiration> {
-    self.expiration.as_ref()
+  pub fn expiration(&self) -> &CacheExpiration {
+    &self.expiration
   }
 
   /// Retrieve whether a cache entry has passed expiration.
   pub fn is_expired(&self) -> bool {
-    if let Some(expiration) = self.expiration() {
-      if expiration.instant() < &Instant::now() {
-        return true;
-      }
+    let expiration = self.expiration();
+    if expiration.instant() < &Instant::now() {
+      return true;
     }
     false
   }
