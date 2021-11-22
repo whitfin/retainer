@@ -7,7 +7,7 @@ repository = "https://github.com/whitfin/retainer"
 keywords = ["async", "futures", "caching", "expiration", "ttl"]
 categories = ["algorithms", "asynchronous", "caching", "data-structures"]
 readme = "README.md"
-edition = "2018"
+edition = "2021"
 license = "MIT"
 
 [dependencies]
