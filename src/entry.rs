@@ -152,7 +152,7 @@ pub struct CacheEntryReadGuard<'a, V> {
 }
 
 impl<'a, V> Deref for CacheEntryReadGuard<'a, V> {
-    type Target = V;
+    type Target = CacheEntry<V>;
 
     // Derefs a cache guard to the internal entry.
     fn deref(&self) -> &Self::Target {

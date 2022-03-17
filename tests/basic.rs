@@ -25,7 +25,7 @@ async fn test_cache_update_operations() {
 
     cache.insert(1, 1, CacheExpiration::none()).await;
 
-    assert_eq!(*cache.get(&1).await.unwrap(), 1);
+    assert_eq!(cache.get(&1).await.unwrap().value(), &1);
 
     cache
         .update(&1, |value| {
@@ -33,5 +33,5 @@ async fn test_cache_update_operations() {
         })
         .await;
 
-    assert_eq!(*cache.get(&1).await.unwrap(), 5);
+    assert_eq!(cache.get(&1).await.unwrap().value(), &5);
 }
