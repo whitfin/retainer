@@ -39,7 +39,7 @@ be compatible with most of the popular asynchronous runtimes. Currently a small
 set of tests are run against async-std, smol and Tokio.
 
 ```rust
-use retainer::Cache;
+use retainer::*;
 use tokio::time::sleep;
 
 use std::sync::Arc;
@@ -69,7 +69,7 @@ async fn main() {
     cache.insert("four", 4, 3500..5000).await;
 
     // insert without expiration (i.e. manual removal)
-    cache.insert_untracked("five", 5).await;
+    cache.insert("five", 5, CacheExpiration::none()).await;
 
     // wait until the monitor has run once
     sleep(Duration::from_millis(3250)).await;

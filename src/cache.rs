@@ -102,17 +102,21 @@ where
     ///
     /// The third argument controls expiration, which can be provided using any type which
     /// implements `Into<CacheExpiration>`. This allows for various different syntax based
-    /// on your use case. If you do not want expiration, see `insert_untracked`.
+    /// on your use case. If you do not want expiration, use `CacheExpiration::none()`.
     pub async fn insert<E>(&self, k: K, v: V, e: E) -> Option<CacheEntry<V>>
     where
         E: Into<CacheExpiration>,
     {
-        self.do_insert(k, v, Some(e.into())).await
-    }
+        let entry = CacheEntry {
+            value: v,
+            expiration: e.into(),
+        };
 
-    /// Insert a key/value pair into the cache with no associated expiration.
-    pub async fn insert_untracked(&self, k: K, v: V) -> Option<CacheEntry<V>> {
-        self.do_insert(k, v, None).await
+        self.store
+            .write()
+            .await
+            .insert(k, entry)
+            .and_then(|entry| unpack!(entry))
     }
 
     /// Check whether the cache is empty.
@@ -295,22 +299,6 @@ where
         if let Some(value) = guard.get_mut(k).and_then(|entry| unpack!(entry)) {
             f(value);
         }
-    }
-
-    /// Internal logic for insertion to avoid multiple definitions.
-    ///
-    /// This is necessary as we have to support storing keys with not attached expiration.
-    async fn do_insert(&self, k: K, v: V, e: Option<CacheExpiration>) -> Option<CacheEntry<V>> {
-        let entry = CacheEntry {
-            value: v,
-            expiration: e,
-        };
-
-        self.store
-            .write()
-            .await
-            .insert(k, entry)
-            .and_then(|entry| unpack!(entry))
     }
 }
 

@@ -17,19 +17,19 @@ use rand::prelude::*;
 #[derive(Debug)]
 pub struct CacheEntry<V> {
     pub(crate) value: V,
-    pub(crate) expiration: Option<CacheExpiration>,
+    pub(crate) expiration: CacheExpiration,
 }
 
 impl<V> CacheEntry<V> {
     /// Retrieve the expiration associated with a cache entry.
-    pub fn expiration(&self) -> Option<&CacheExpiration> {
-        self.expiration.as_ref()
+    pub fn expiration(&self) -> &CacheExpiration {
+        &self.expiration
     }
 
     /// Retrieve whether a cache entry has passed expiration.
     pub fn is_expired(&self) -> bool {
-        if let Some(expiration) = self.expiration() {
-            if expiration.instant() < &Instant::now() {
+        if let Some(ref expiration) = self.expiration().instant() {
+            if expiration < &Instant::now() {
                 return true;
             }
         }
@@ -81,25 +81,41 @@ impl<V> DerefMut for CacheEntry<V> {
 /// type when adding entries to a cache.
 #[derive(Debug)]
 pub struct CacheExpiration {
-    instant: Instant,
+    instant: Option<Instant>,
 }
 
 impl CacheExpiration {
+    /// Create an expiration at a given instant.
+    pub fn new<I>(instant: I) -> Self
+    where
+        I: Into<Instant>,
+    {
+        Self {
+            instant: Some(instant.into()),
+        }
+    }
+
+    /// Create an empty expiration (i.e. no expiration).
+    pub fn none() -> Self {
+        Self { instant: None }
+    }
+
     /// Retrieve the instant associated with this expiration.
-    pub fn instant(&self) -> &Instant {
+    pub fn instant(&self) -> &Option<Instant> {
         &self.instant
     }
 
-    /// Retrieve the time remaning before expiration.
-    pub fn remaining(&self) -> Duration {
-        self.instant.saturating_duration_since(Instant::now())
+    /// Retrieve the time remaining before expiration.
+    pub fn remaining(&self) -> Option<Duration> {
+        self.instant
+            .map(|i| i.saturating_duration_since(Instant::now()))
     }
 }
 
 // Automatic conversation from `Instant`.
 impl From<Instant> for CacheExpiration {
     fn from(instant: Instant) -> Self {
-        Self { instant }
+        Self::new(instant)
     }
 }
 

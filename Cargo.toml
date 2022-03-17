@@ -1,6 +1,6 @@
 [package]
 name = "retainer"
-version = "0.2.2" # remember to update html_root_url
+version = "0.3.0" # remember to update html_root_url
 authors = ["Isaac Whitfield <iw@whitfin.io>"]
 description = "Minimal async cache in Rust with support for key expirations "
 repository = "https://github.com/whitfin/retainer"

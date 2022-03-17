@@ -1,5 +1,5 @@
 use async_std::task;
-use retainer::Cache;
+use retainer::*;
 use smol::Timer;
 
 use std::sync::Arc;
@@ -75,7 +75,7 @@ async fn execute_base_test(cache: Arc<Cache<&str, usize>>) {
     cache.insert("four", 4, 3500..5000).await;
 
     // insert without expiration (i.e. manual removal)
-    cache.insert_untracked("five", 5).await;
+    cache.insert("five", 5, CacheExpiration::none()).await;
 
     // wait until the monitor has run once
     Timer::after(Duration::from_millis(3250)).await;

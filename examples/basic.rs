@@ -1,4 +1,4 @@
-use retainer::Cache;
+use retainer::*;
 use simple_logger::SimpleLogger;
 
 use std::time::Duration;

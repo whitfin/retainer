@@ -1,12 +1,12 @@
-use retainer::Cache;
+use retainer::*;
 
 #[tokio::test]
 async fn test_cache_size_operations() {
     let cache = Cache::<u8, u8>::new();
 
-    cache.insert_untracked(1, 2).await;
-    cache.insert_untracked(2, 2).await;
-    cache.insert_untracked(3, 3).await;
+    cache.insert(1, 2, CacheExpiration::none()).await;
+    cache.insert(2, 2, CacheExpiration::none()).await;
+    cache.insert(3, 3, CacheExpiration::none()).await;
 
     assert_eq!(cache.len().await, 3);
     assert_eq!(cache.expired().await, 0);
@@ -23,7 +23,7 @@ async fn test_cache_size_operations() {
 async fn test_cache_update_operations() {
     let cache = Cache::<u8, u8>::new();
 
-    cache.insert_untracked(1, 1).await;
+    cache.insert(1, 1, CacheExpiration::none()).await;
 
     assert_eq!(*cache.get(&1).await.unwrap(), 1);
 
