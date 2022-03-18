@@ -82,9 +82,11 @@ where
     /// The returned reference is bound inside a `RwLockReadGuard`.
     pub async fn get(&self, k: &K) -> Option<CacheEntryReadGuard<'_, V>> {
         let guard = self.store.read().await;
+        let found = guard.get(k)?;
+        let valid = unpack!(found)?;
 
-        unpack!(guard.get(k)?).map(|entry| CacheEntryReadGuard {
-            entry,
+        Some(CacheEntryReadGuard {
+            entry: valid,
             marker: PhantomData,
         })
     }
