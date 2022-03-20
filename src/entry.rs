@@ -144,12 +144,17 @@ pub struct CacheReadGuard<'a, V> {
 impl<'a, V> CacheReadGuard<'a, V> {
     /// Retrieve the internal guarded expiration.
     pub fn expiration(&self) -> &CacheExpiration {
-        unsafe { &*self.entry }.expiration()
+        self.entry().expiration()
     }
 
     /// Retrieve the internal guarded value.
     pub fn value(&self) -> &V {
-        unsafe { &*self.entry }.value()
+        self.entry().value()
+    }
+
+    /// Retrieve a reference to the internal entry.
+    fn entry(&self) -> &CacheEntry<V> {
+        unsafe { &*self.entry }
     }
 }
 
