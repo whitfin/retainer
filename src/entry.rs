@@ -4,8 +4,7 @@
 //! and access functions for both. To be more convenient to the
 //! called, a `CacheEntry<V>` will also dereference to `V`.
 use std::marker::PhantomData;
-use std::ops::Range;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, Range};
 use std::time::{Duration, Instant};
 
 use rand::prelude::*;
@@ -15,51 +14,35 @@ use rand::prelude::*;
 /// Each entry has a value and optional expiration associated, with
 /// the value being seen through the `Deref` trait for convenience.
 #[derive(Debug)]
-pub struct CacheEntry<V> {
-    pub(crate) value: V,
-    pub(crate) expiration: CacheExpiration,
+pub(crate) struct CacheEntry<V> {
+    value: V,
+    expiration: CacheExpiration,
 }
 
 impl<V> CacheEntry<V> {
-    /// Retrieve the expiration associated with a cache entry.
+    /// Create a new cache entry from a value and expiration.
+    pub fn new(value: V, expiration: CacheExpiration) -> Self {
+        Self { value, expiration }
+    }
+
+    /// Retrieve the internal expiration.
     pub fn expiration(&self) -> &CacheExpiration {
         &self.expiration
     }
 
-    /// Retrieve whether a cache entry has passed expiration.
-    pub fn is_expired(&self) -> bool {
-        if let Some(ref expiration) = self.expiration().instant() {
-            if expiration < &Instant::now() {
-                return true;
-            }
-        }
-        false
+    /// Take the internal value.
+    pub fn take(self) -> V {
+        self.value
     }
 
-    /// Retrieve a reference to a value in a cache entry.
+    /// Retrieve the internal value.
     pub fn value(&self) -> &V {
         &self.value
     }
 
-    /// Retrieve a mutable reference to a value in a cache entry.
+    /// Retrieve the mutable internal value.
     pub fn value_mut(&mut self) -> &mut V {
         &mut self.value
-    }
-}
-
-impl<V> Deref for CacheEntry<V> {
-    type Target = V;
-
-    // Derefs a cache entry to the internal value.
-    fn deref(&self) -> &Self::Target {
-        self.value()
-    }
-}
-
-// Derefs a cache entry to the mutable internal value.
-impl<V> DerefMut for CacheEntry<V> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.value_mut()
     }
 }
 
@@ -105,6 +88,13 @@ impl CacheExpiration {
         &self.instant
     }
 
+    /// Retrieve whether a cache entry has passed expiration.
+    pub fn is_expired(&self) -> bool {
+        self.instant()
+            .map(|expiration| expiration < Instant::now())
+            .unwrap_or(false)
+    }
+
     /// Retrieve the time remaining before expiration.
     pub fn remaining(&self) -> Option<Duration> {
         self.instant
@@ -146,20 +136,32 @@ impl From<Range<u64>> for CacheExpiration {
 /// when using locking mechanisms. This structure should be transparent for the
 /// most part as it implements `Deref` to convert itself into the inner value.
 #[derive(Debug)]
-pub struct CacheEntryReadGuard<'a, V> {
+pub struct CacheReadGuard<'a, V> {
     pub(crate) entry: *const CacheEntry<V>,
     pub(crate) marker: PhantomData<&'a CacheEntry<V>>,
 }
 
-impl<'a, V> Deref for CacheEntryReadGuard<'a, V> {
-    type Target = CacheEntry<V>;
+impl<'a, V> CacheReadGuard<'a, V> {
+    /// Retrieve the internal guarded expiration.
+    pub fn expiration(&self) -> &CacheExpiration {
+        unsafe { &*self.entry }.expiration()
+    }
+
+    /// Retrieve the internal guarded value.
+    pub fn value(&self) -> &V {
+        unsafe { &*self.entry }.value()
+    }
+}
+
+impl<'a, V> Deref for CacheReadGuard<'a, V> {
+    type Target = V;
 
     // Derefs a cache guard to the internal entry.
     fn deref(&self) -> &Self::Target {
-        unsafe { &*self.entry }
+        self.value()
     }
 }
 
 // Stores a raw pointer to `T`, so if `T` is `Sync`, the lock guard over `T` is `Send`.
-unsafe impl<V> Send for CacheEntryReadGuard<'_, V> where V: Sized + Sync {}
-unsafe impl<V> Sync for CacheEntryReadGuard<'_, V> where V: Sized + Send + Sync {}
+unsafe impl<V> Send for CacheReadGuard<'_, V> where V: Sized + Sync {}
+unsafe impl<V> Sync for CacheReadGuard<'_, V> where V: Sized + Send + Sync {}

@@ -18,12 +18,12 @@ use async_timer::Interval;
 use log::{debug, log_enabled, trace, Level};
 use rand::prelude::*;
 
-use crate::entry::{CacheEntry, CacheEntryReadGuard, CacheExpiration};
+use crate::entry::{CacheEntry, CacheExpiration, CacheReadGuard};
 
 // Define small private macro to unpack entry references.
 macro_rules! unpack {
     ($entry: expr) => {
-        if $entry.is_expired() {
+        if $entry.expiration().is_expired() {
             None
         } else {
             Some($entry)
@@ -73,19 +73,19 @@ where
             .read()
             .await
             .iter()
-            .filter(|(_, entry)| entry.is_expired())
+            .filter(|(_, entry)| entry.expiration().is_expired())
             .count()
     }
 
     /// Retrieve a reference to a value inside the cache.
     ///
     /// The returned reference is bound inside a `RwLockReadGuard`.
-    pub async fn get(&self, k: &K) -> Option<CacheEntryReadGuard<'_, V>> {
+    pub async fn get(&self, k: &K) -> Option<CacheReadGuard<'_, V>> {
         let guard = self.store.read().await;
         let found = guard.get(k)?;
         let valid = unpack!(found)?;
 
-        Some(CacheEntryReadGuard {
+        Some(CacheReadGuard {
             entry: valid,
             marker: PhantomData,
         })
@@ -105,20 +105,17 @@ where
     /// The third argument controls expiration, which can be provided using any type which
     /// implements `Into<CacheExpiration>`. This allows for various different syntax based
     /// on your use case. If you do not want expiration, use `CacheExpiration::none()`.
-    pub async fn insert<E>(&self, k: K, v: V, e: E) -> Option<CacheEntry<V>>
+    pub async fn insert<E>(&self, k: K, v: V, e: E) -> Option<V>
     where
         E: Into<CacheExpiration>,
     {
-        let entry = CacheEntry {
-            value: v,
-            expiration: e.into(),
-        };
-
+        let entry = CacheEntry::new(v, e.into());
         self.store
             .write()
             .await
             .insert(k, entry)
             .and_then(|entry| unpack!(entry))
+            .map(CacheEntry::take)
     }
 
     /// Check whether the cache is empty.
@@ -212,7 +209,7 @@ where
                     let (key, entry) = iter.next().unwrap();
 
                     // skip if not expired
-                    if !entry.is_expired() {
+                    if !entry.expiration().is_expired() {
                         continue;
                     }
 
@@ -271,12 +268,13 @@ where
     }
 
     /// Remove an entry from the cache and return any stored value.
-    pub async fn remove(&self, k: &K) -> Option<CacheEntry<V>> {
+    pub async fn remove(&self, k: &K) -> Option<V> {
         self.store
             .write()
             .await
             .remove(k)
             .and_then(|entry| unpack!(entry))
+            .map(CacheEntry::take)
     }
 
     /// Retrieve the number of unexpired entries inside the cache.
@@ -288,7 +286,7 @@ where
             .read()
             .await
             .iter()
-            .filter(|(_, entry)| !entry.is_expired())
+            .filter(|(_, entry)| !entry.expiration().is_expired())
             .count()
     }
 
@@ -298,8 +296,8 @@ where
         F: FnOnce(&mut V),
     {
         let mut guard = self.store.write().await;
-        if let Some(value) = guard.get_mut(k).and_then(|entry| unpack!(entry)) {
-            f(value);
+        if let Some(entry) = guard.get_mut(k).and_then(|entry| unpack!(entry)) {
+            f(entry.value_mut());
         }
     }
 }

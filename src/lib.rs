@@ -10,5 +10,4 @@ pub mod entry;
 
 // lifted types to the top level
 pub use crate::cache::Cache;
-pub use crate::entry::CacheEntry;
 pub use crate::entry::CacheExpiration;
