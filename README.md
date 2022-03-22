@@ -22,7 +22,7 @@ easiest way to use it is to add an entry to your `Cargo.toml` defining the depen
 
 ```toml
 [dependencies]
-retainer = "0.2"
+retainer = "0.3"
 ```
 
 ### Basic Usage
