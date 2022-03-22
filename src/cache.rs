@@ -115,7 +115,7 @@ where
             .await
             .insert(k, entry)
             .and_then(|entry| unpack!(entry))
-            .map(CacheEntry::take)
+            .map(CacheEntry::into_inner)
     }
 
     /// Check whether the cache is empty.
@@ -274,7 +274,7 @@ where
             .await
             .remove(k)
             .and_then(|entry| unpack!(entry))
-            .map(CacheEntry::take)
+            .map(CacheEntry::into_inner)
     }
 
     /// Retrieve the number of unexpired entries inside the cache.
