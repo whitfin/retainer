@@ -1,5 +1,5 @@
 # Retainer
-[![Build Status](https://img.shields.io/github/workflow/status/whitfin/retainer/CI)](https://github.com/whitfin/retainer/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/whitfin/retainer/ci.yml?branch=main)](https://github.com/whitfin/retainer/actions)
 [![Crates.io](https://img.shields.io/crates/v/retainer.svg)](https://crates.io/crates/retainer)
 
 This crate offers a very small cache with asynchronous bindings, allowing it to be
