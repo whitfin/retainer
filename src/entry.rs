@@ -30,6 +30,11 @@ impl<V> CacheEntry<V> {
         &self.expiration
     }
 
+    /// Retrieve the mutable internal expiration
+    pub fn expiration_mut(&mut self) -> &mut CacheExpiration {
+        &mut self.expiration
+    }
+
     /// Retrieve the internal value.
     pub fn value(&self) -> &V {
         &self.value

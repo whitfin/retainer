@@ -300,6 +300,16 @@ where
             f(entry.value_mut());
         }
     }
+
+    pub async fn update_expiration<F>(&self, k: &K, f: F)
+    where
+        F: FnOnce(&mut CacheExpiration),
+    {
+        let mut guard = self.store.write().await;
+        if let Some(entry) = guard.get_mut(k).and_then(|entry| unpack!(entry)) {
+            f(entry.expiration_mut());
+        }
+    }
 }
 
 /// Default implementation.
