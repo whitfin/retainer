@@ -301,6 +301,7 @@ where
         }
     }
 
+    /// Updates the expiration of an entry in place
     pub async fn update_expiration<F>(&self, k: &K, f: F)
     where
         F: FnOnce(&mut CacheExpiration),
