@@ -301,7 +301,7 @@ where
         }
     }
 
-    /// Updates the expiration of an entry in place
+    /// Sets the expiration of an entry
     pub async fn set_expiration<E>(&self, k: &K, e: E)
     where
         E: Into<CacheExpiration>,
