@@ -8,6 +8,7 @@
 //! The eviction algorithm has been based on Redis, and essentially just samples
 //! the entry set on an interval to prune the inner tree over time. More information
 //! on how this works can be seen on the `monitor` method of the `Cache` type.
+use std::borrow::Borrow;
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
 use std::marker::PhantomData;
@@ -80,7 +81,11 @@ where
     /// Retrieve a reference to a value inside the cache.
     ///
     /// The returned reference is bound inside a `RwLockReadGuard`.
-    pub async fn get(&self, k: &K) -> Option<CacheReadGuard<'_, V>> {
+    pub async fn get<Q>(&self, k: &Q) -> Option<CacheReadGuard<'_, V>>
+    where
+        K: Borrow<Q>,
+        Q: Ord + ?Sized,
+    {
         let guard = self.store.read().await;
         let found = guard.get(k)?;
         let valid = unpack!(found)?;
@@ -268,7 +273,11 @@ where
     }
 
     /// Remove an entry from the cache and return any stored value.
-    pub async fn remove(&self, k: &K) -> Option<V> {
+    pub async fn remove<Q>(&self, k: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: Ord + ?Sized,
+    {
         self.store
             .write()
             .await
@@ -291,8 +300,10 @@ where
     }
 
     /// Updates an entry in the cache without changing the expiration.
-    pub async fn update<F>(&self, k: &K, f: F)
+    pub async fn update<Q, F>(&self, k: &Q, f: F)
     where
+        K: Borrow<Q>,
+        Q: Ord + ?Sized,
         F: FnOnce(&mut V),
     {
         let mut guard = self.store.write().await;
