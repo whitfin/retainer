@@ -18,11 +18,11 @@ improvements and I'll get to them as soon as possible :).
 ### Getting Started
 
 This crate is available on [crates.io](https://crates.io/crates/retainer). The
-easiest way to use it is to add an entry to your `Cargo.toml` defining the dependency:
+easiest way to use it is to add an entry to your `Cargo.toml` defining the dependency
+using `cargo add`:
 
-```toml
-[dependencies]
-retainer = "0.3"
+```sh
+$ cargo add retainer
 ```
 
 ### Basic Usage
