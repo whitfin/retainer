@@ -1,8 +1,4 @@
-//! Very small caching utility with async locking support.
-//!
-//! All interaction in this crate will be done through the `Cache` type,
-//! so please see the the `cache` module for further instructions.
-#![doc(html_root_url = "https://docs.rs/retainer/0.3.0")]
+#![doc = include_str!("../README.md")]
 
 // exposed modules
 pub mod cache;
