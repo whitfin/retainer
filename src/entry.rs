@@ -56,8 +56,7 @@ impl<V> CacheEntry<V> {
 /// * `u64` -> a number of milliseconds to pass before an entry should expire.
 /// * `Instant` -> an exact time that an entry should expire.
 /// * `Duration` -> a duration to pass before an entry should expire.
-/// * `Range<u64>` -> a random range of milliseconds to sample from to
-///                   determine when an entry should expire.
+/// * `Range<u64>` -> a random range of milliseconds to sample expiry from.
 ///
 /// Other conversions may be added in future, but this should suffice for most
 /// cases. Any of these types may be passed to the insertion methods on a cache
@@ -141,7 +140,7 @@ pub struct CacheReadGuard<'a, V> {
     pub(crate) marker: PhantomData<&'a CacheEntry<V>>,
 }
 
-impl<'a, V> CacheReadGuard<'a, V> {
+impl<V> CacheReadGuard<'_, V> {
     /// Retrieve the internal guarded expiration.
     pub fn expiration(&self) -> &CacheExpiration {
         self.entry().expiration()
@@ -158,7 +157,7 @@ impl<'a, V> CacheReadGuard<'a, V> {
     }
 }
 
-impl<'a, V> Deref for CacheReadGuard<'a, V> {
+impl<V> Deref for CacheReadGuard<'_, V> {
     type Target = V;
 
     // Derefs a cache guard to the internal entry.

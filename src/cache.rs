@@ -146,8 +146,8 @@ where
     /// 2. Take a sample of `sample` keys from the cache.
     /// 3. Remove any expired keys from the sample.
     /// 4. Based on `threshold` percentage:
-    ///     4a. If more than `threshold` were expired, goto #2.
-    ///     4b. If less than `threshold` were expired, goto #1.
+    ///    4a. If more than `threshold` were expired, goto #2.
+    ///    4b. If less than `threshold` were expired, goto #1.
     ///
     /// This means that at any point you may have up to `threshold` percent of your
     /// cache storing expired entries (assuming the monitor just ran), so make sure
