@@ -1,6 +1,6 @@
+use async_io::Timer;
 use async_std::task;
 use retainer::*;
-use smol::Timer;
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
