@@ -126,7 +126,7 @@ impl From<Duration> for CacheExpiration {
 // Automatic conversation from `u64`.
 impl From<Range<u64>> for CacheExpiration {
     fn from(range: Range<u64>) -> Self {
-        rand::thread_rng().gen_range(range).into()
+        rand::rng().random_range(range).into()
     }
 }
 

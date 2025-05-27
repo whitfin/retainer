@@ -13,8 +13,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
+use async_io::Timer;
 use async_lock::{RwLock, RwLockUpgradableReadGuard};
-use async_timer::Interval;
+use futures_lite::stream::StreamExt;
 use log::{debug, log_enabled, trace, Level};
 use rand::prelude::*;
 
@@ -130,9 +131,9 @@ where
     ///
     /// For expiration logic, please see `Cache::purge`, as this is used under the hood.
     pub async fn monitor(&self, sample: usize, threshold: f64, frequency: Duration) {
-        let mut interval = Interval::platform_new(frequency);
+        let mut interval = Timer::interval(frequency);
         loop {
-            interval.as_mut().await;
+            interval.next().await;
             self.purge(sample, threshold).await;
         }
     }
@@ -179,9 +180,9 @@ where
 
             {
                 // fetch `sample` keys at random
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 while indices.len() < sample {
-                    indices.insert(rng.gen_range(0..total));
+                    indices.insert(rng.random_range(0..total));
                 }
             }
 
