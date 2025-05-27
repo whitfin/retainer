@@ -312,6 +312,17 @@ where
             f(entry.value_mut());
         }
     }
+
+    /// Sets the expiration of an entry
+    pub async fn set_expiration<E>(&self, k: &K, e: E)
+    where
+        E: Into<CacheExpiration>,
+    {
+        let mut guard = self.store.write().await;
+        if let Some(entry) = guard.get_mut(k).and_then(|entry| unpack!(entry)) {
+            entry.set_expiration(e.into());
+        }
+    }
 }
 
 /// Default implementation.
