@@ -35,3 +35,17 @@ async fn test_cache_update_operations() {
 
     assert_eq!(cache.get(&1).await.unwrap().value(), &5);
 }
+
+#[tokio::test]
+async fn test_cache_borrow_types() {
+    let key = "key".to_string();
+    let cache = Cache::<String, bool>::new();
+
+    cache
+        .insert(key.clone(), true, CacheExpiration::none())
+        .await;
+
+    let lookup: &str = &key;
+
+    assert!(cache.get(lookup).await.unwrap().value());
+}

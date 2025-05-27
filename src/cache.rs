@@ -82,10 +82,10 @@ where
     /// Retrieve a reference to a value inside the cache.
     ///
     /// The returned reference is bound inside a `RwLockReadGuard`.
-    pub async fn get<Q>(&self, k: &Q) -> Option<CacheReadGuard<'_, V>>
+    pub async fn get<B>(&self, k: &B) -> Option<CacheReadGuard<'_, V>>
     where
-        K: Borrow<Q>,
-        Q: Ord + ?Sized,
+        K: Borrow<B>,
+        B: Ord + ?Sized,
     {
         let guard = self.store.read().await;
         let found = guard.get(k)?;
@@ -274,10 +274,10 @@ where
     }
 
     /// Remove an entry from the cache and return any stored value.
-    pub async fn remove<Q>(&self, k: &Q) -> Option<V>
+    pub async fn remove<B>(&self, k: &B) -> Option<V>
     where
-        K: Borrow<Q>,
-        Q: Ord + ?Sized,
+        K: Borrow<B>,
+        B: Ord + ?Sized,
     {
         self.store
             .write()
@@ -301,10 +301,10 @@ where
     }
 
     /// Updates an entry in the cache without changing the expiration.
-    pub async fn update<Q, F>(&self, k: &Q, f: F)
+    pub async fn update<B, F>(&self, k: &B, f: F)
     where
-        K: Borrow<Q>,
-        Q: Ord + ?Sized,
+        K: Borrow<B>,
+        B: Ord + ?Sized,
         F: FnOnce(&mut V),
     {
         let mut guard = self.store.write().await;
