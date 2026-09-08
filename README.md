@@ -107,7 +107,7 @@ async fn main() {
 ```
 
 In the case this example is not kept up to date, you can look for any types which
-implement the `Into<CacheExpiratio>` trait in the documentation for a complete list.
+implement the `Into<CacheExpiration>` trait in the documentation for a complete list.
 
 ### Cache Monitoring
 
