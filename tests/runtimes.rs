@@ -51,7 +51,7 @@ async fn test_tokio() {
     // spawn the monitor
     let monitor = tokio::spawn(async move {
         // don't forget to monitor your cache to evict entries
-        clone.monitor(3, 0.25, Duration::from_secs(3)).await
+        clone.monitor(25, 0.25, Duration::from_secs(3)).await
     });
 
     // execute the set of base tests
