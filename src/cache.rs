@@ -10,7 +10,6 @@
 //! on how this works can be seen on the `monitor` method of the `Cache` type.
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
-use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
 use async_lock::{RwLock, RwLockUpgradableReadGuard};
@@ -33,9 +32,7 @@ macro_rules! unpack {
 
 /// Basic caching structure with asynchronous locking support.
 ///
-/// This structure provides asynchronous access wrapped around a standard
-/// `BTreeMap` to avoid blocking event loops when a writer cannot gain a
-/// handle - which is what would happen with standard locking implementations.
+/// The returned reference is bound inside a `RwLockReadGuard`.
 pub struct Cache<K, V> {
     store: RwLock<BTreeMap<K, CacheEntry<V>>>,
     label: String,
@@ -79,15 +76,20 @@ where
 
     /// Retrieve a reference to a value inside the cache.
     ///
-    /// The returned reference is bound inside a `RwLockReadGuard`.
-    pub async fn get(&self, k: &K) -> Option<CacheReadGuard<'_, V>> {
+    /// The returned reference holds a read lock on the cache. It should be dropped
+    /// as soon as possible and must not be retained across unrelated `.await` points,
+    /// since writers cannot make progress while it exists.
+    pub async fn get(&self, k: &K) -> Option<CacheReadGuard<'_, K, V>> {
         let guard = self.store.read().await;
         let found = guard.get(k)?;
-        let valid = unpack!(found)?;
+
+        if found.expiration().is_expired() {
+            return None;
+        }
 
         Some(CacheReadGuard {
-            entry: valid,
-            marker: PhantomData,
+            entry: found as *const CacheEntry<V>,
+            _read: guard,
         })
     }
 

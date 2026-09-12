@@ -3,10 +3,11 @@
 //! Each entry has an associated value and optional expiration,
 //! and access functions for both. To be more convenient to the
 //! called, a `CacheEntry<V>` will also dereference to `V`.
-use std::marker::PhantomData;
+use std::collections::BTreeMap;
 use std::ops::{Deref, Range};
 use std::time::{Duration, Instant};
 
+use async_lock::RwLockReadGuard;
 use rand::prelude::*;
 
 /// Represents an entry inside the cache.
@@ -132,16 +133,17 @@ impl From<Range<u64>> for CacheExpiration {
 
 /// Read guard for references to the inner cache structure.
 ///
-/// This structure is required to return references to the inner cache entries
-/// when using locking mechanisms. This structure should be transparent for the
-/// most part as it implements `Deref` to convert itself into the inner value.
+/// This structure retains the cache's read lock, ensuring that the referenced
+/// entry cannot be modified or removed while it is in use. It should be dropped
+/// as soon as possible so that writers can make progress. It implements `Deref`
+/// to expose the inner value.
 #[derive(Debug)]
-pub struct CacheReadGuard<'a, V> {
+pub struct CacheReadGuard<'a, K, V> {
     pub(crate) entry: *const CacheEntry<V>,
-    pub(crate) marker: PhantomData<&'a CacheEntry<V>>,
+    pub(crate) _read: RwLockReadGuard<'a, BTreeMap<K, CacheEntry<V>>>,
 }
 
-impl<'a, V> CacheReadGuard<'a, V> {
+impl<K, V> CacheReadGuard<'_, K, V> {
     /// Retrieve the internal guarded expiration.
     pub fn expiration(&self) -> &CacheExpiration {
         self.entry().expiration()
@@ -158,7 +160,7 @@ impl<'a, V> CacheReadGuard<'a, V> {
     }
 }
 
-impl<'a, V> Deref for CacheReadGuard<'a, V> {
+impl<K, V> Deref for CacheReadGuard<'_, K, V> {
     type Target = V;
 
     // Derefs a cache guard to the internal entry.
@@ -167,6 +169,18 @@ impl<'a, V> Deref for CacheReadGuard<'a, V> {
     }
 }
 
-// Stores a raw pointer to `T`, so if `T` is `Sync`, the lock guard over `T` is `Send`.
-unsafe impl<V> Send for CacheReadGuard<'_, V> where V: Sized + Sync {}
-unsafe impl<V> Sync for CacheReadGuard<'_, V> where V: Sized + Send + Sync {}
+// The pointer is protected by the retained read guard. Moving or sharing the
+// wrapper is safe whenever the complete guarded map is safe to share.
+unsafe impl<K, V> Send for CacheReadGuard<'_, K, V>
+where
+    K: Sync,
+    V: Sync,
+{
+}
+
+unsafe impl<K, V> Sync for CacheReadGuard<'_, K, V>
+where
+    K: Sync,
+    V: Sync,
+{
+}
