@@ -57,8 +57,7 @@ impl<V> CacheEntry<V> {
 /// * `u64` -> a number of milliseconds to pass before an entry should expire.
 /// * `Instant` -> an exact time that an entry should expire.
 /// * `Duration` -> a duration to pass before an entry should expire.
-/// * `Range<u64>` -> a random range of milliseconds to sample from to
-///                   determine when an entry should expire.
+/// * `Range<u64>` -> a random range of milliseconds to sample expiry from.
 ///
 /// Other conversions may be added in future, but this should suffice for most
 /// cases. Any of these types may be passed to the insertion methods on a cache
@@ -127,7 +126,7 @@ impl From<Duration> for CacheExpiration {
 // Automatic conversation from `u64`.
 impl From<Range<u64>> for CacheExpiration {
     fn from(range: Range<u64>) -> Self {
-        rand::thread_rng().gen_range(range).into()
+        rand::rng().random_range(range).into()
     }
 }
 

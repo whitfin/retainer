@@ -8,12 +8,14 @@
 //! The eviction algorithm has been based on Redis, and essentially just samples
 //! the entry set on an interval to prune the inner tree over time. More information
 //! on how this works can be seen on the `monitor` method of the `Cache` type.
+use std::borrow::Borrow;
 use std::cmp;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
+use async_io::Timer;
 use async_lock::{RwLock, RwLockUpgradableReadGuard};
-use async_timer::Interval;
+use futures_lite::stream::StreamExt;
 use log::{debug, log_enabled, trace, Level};
 use rand::seq::index;
 
@@ -79,7 +81,11 @@ where
     /// The returned reference holds a read lock on the cache. It should be dropped
     /// as soon as possible and must not be retained across unrelated `.await` points,
     /// since writers cannot make progress while it exists.
-    pub async fn get(&self, k: &K) -> Option<CacheReadGuard<'_, K, V>> {
+    pub async fn get<B>(&self, k: &B) -> Option<CacheReadGuard<'_, K, V>>
+    where
+        K: Borrow<B>,
+        B: Ord + ?Sized,
+    {
         let guard = self.store.read().await;
         let found = guard.get(k)?;
 
@@ -136,9 +142,9 @@ where
         assert!((0.0..=1.0).contains(&threshold), "threshold must be 0..=1");
         assert!(frequency > Duration::from_secs(0), "frequency must be > 0");
 
-        let mut interval = Interval::platform_new(frequency);
+        let mut interval = Timer::interval(frequency);
         loop {
-            interval.as_mut().await;
+            interval.next().await;
             self.purge(sample, threshold).await;
         }
     }
@@ -180,7 +186,7 @@ where
             let sample = cmp::min(sample, total);
 
             // generate unique indices without a collision loop, and prepare to walk the store
-            let mut indices = index::sample(&mut rand::thread_rng(), total, sample).into_vec();
+            let mut indices = index::sample(&mut rand::rng(), total, sample).into_vec();
             let mut entries = store.iter();
 
             // sort to visit in order
@@ -257,7 +263,11 @@ where
     }
 
     /// Remove an entry from the cache and return any stored value.
-    pub async fn remove(&self, k: &K) -> Option<V> {
+    pub async fn remove<B>(&self, k: &B) -> Option<V>
+    where
+        K: Borrow<B>,
+        B: Ord + ?Sized,
+    {
         self.store
             .write()
             .await
@@ -280,8 +290,10 @@ where
     }
 
     /// Updates an entry in the cache without changing the expiration.
-    pub async fn update<F>(&self, k: &K, f: F)
+    pub async fn update<B, F>(&self, k: &B, f: F)
     where
+        K: Borrow<B>,
+        B: Ord + ?Sized,
         F: FnOnce(&mut V),
     {
         let mut guard = self.store.write().await;

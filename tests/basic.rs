@@ -81,6 +81,20 @@ async fn test_cache_update_changes_value() {
 }
 
 #[tokio::test]
+async fn test_cache_borrow_types() {
+    let key = "key".to_string();
+    let cache = Cache::<String, bool>::new();
+
+    cache
+        .insert(key.clone(), true, CacheExpiration::none())
+        .await;
+
+    let lookup: &str = &key;
+
+    assert!(cache.get(lookup).await.unwrap().value());
+}
+
+#[tokio::test]
 async fn test_cache_update_ignores_missing_entry() {
     let cache = Cache::<u8, u8>::new();
     let mut called = false;

@@ -18,11 +18,11 @@ improvements and I'll get to them as soon as possible :).
 ### Getting Started
 
 This crate is available on [crates.io](https://crates.io/crates/retainer). The
-easiest way to use it is to add an entry to your `Cargo.toml` defining the dependency:
+easiest way to use it is to add an entry to your `Cargo.toml` defining the dependency
+using `cargo add`:
 
-```toml
-[dependencies]
-retainer = "0.4"
+```sh
+$ cargo add retainer
 ```
 
 ### Basic Usage
@@ -107,7 +107,7 @@ async fn main() {
 ```
 
 In the case this example is not kept up to date, you can look for any types which
-implement the `Into<CacheExpiratio>` trait in the documentation for a complete list.
+implement the `Into<CacheExpiration>` trait in the documentation for a complete list.
 
 ### Cache Monitoring
 
