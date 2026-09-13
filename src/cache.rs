@@ -195,7 +195,7 @@ where
             let mut keys = Vec::new();
             let mut previous = 0;
 
-            // walk the inner mapping at most once to locate our
+            // walk the inner mapping at most once to locate our items
             for (position, index) in indices.into_iter().enumerate() {
                 let offset = if position == 0 {
                     index
