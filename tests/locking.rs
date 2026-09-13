@@ -1,4 +1,4 @@
-use retainer::entry::CacheReadGuard;
+use retainer::entry::{CacheReadGuard, CacheWriteGuard};
 use retainer::{Cache, CacheExpiration};
 
 use std::sync::Arc;
@@ -85,6 +85,24 @@ async fn test_cache_get_does_not_clone_key() {
     assert_eq!(*guard, 2);
 }
 
+#[tokio::test]
+async fn test_cache_get_mut_does_not_clone_key() {
+    let cache = Cache::<PanicOnClone, u8>::new();
+    assert_eq!(
+        cache
+            .insert(PanicOnClone(1), 2, CacheExpiration::none())
+            .await,
+        None
+    );
+    assert_eq!(cache.len().await, 1);
+
+    let lookup = PanicOnClone(1);
+    let mut guard = cache.get_mut(&lookup).await.unwrap();
+    *guard = 3;
+
+    assert_eq!(*guard, 3);
+}
+
 #[test]
 fn test_cache_read_guard_is_send_and_sync_for_sync_types() {
     fn assert_send_and_sync<T: Send + Sync>() {}
@@ -107,4 +125,67 @@ async fn test_cache_read_guard_can_be_read_after_moving_to_another_thread() {
             .join()
             .expect("reader thread panicked");
     });
+}
+
+#[tokio::test]
+async fn test_cache_write_guard_holds_write_lock() {
+    let cache = Arc::new(Cache::<u8, u8>::new());
+
+    cache.insert(1, 1, CacheExpiration::none()).await;
+    assert_eq!(cache.len().await, 1);
+
+    let mut guard = cache.get_mut(&1).await.unwrap();
+    let reader_cache = Arc::clone(&cache);
+    let (started_tx, started_rx) = channel();
+
+    let mut reader = tokio::spawn(async move {
+        started_tx.send(()).unwrap();
+        reader_cache.get(&1).await.map(|guard| *guard)
+    });
+
+    started_rx.await.unwrap();
+
+    assert!(
+        timeout(Duration::from_millis(50), &mut reader)
+            .await
+            .is_err(),
+        "reader completed while the write guard was still held"
+    );
+
+    *guard = 2;
+    drop(guard);
+
+    assert_eq!(
+        timeout(Duration::from_secs(1), reader)
+            .await
+            .expect("reader remained blocked after the write guard was dropped")
+            .expect("reader task panicked"),
+        Some(2)
+    );
+}
+
+#[test]
+fn test_cache_write_guard_is_send_and_sync_for_send_and_sync_types() {
+    fn assert_send_and_sync<T: Send + Sync>() {}
+
+    assert_send_and_sync::<CacheWriteGuard<'static, u8, u8>>();
+}
+
+#[tokio::test]
+async fn test_cache_write_guard_can_be_mutated_after_moving_to_another_thread() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.insert(1, 10, CacheExpiration::none()).await;
+    assert_eq!(cache.len().await, 1);
+
+    let mut guard = cache.get_mut(&1).await.unwrap();
+
+    std::thread::scope(|scope| {
+        scope
+            .spawn(move || *guard = 20)
+            .join()
+            .expect("writer thread panicked");
+    });
+
+    assert_eq!(*cache.get(&1).await.unwrap(), 20);
 }

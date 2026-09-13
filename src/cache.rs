@@ -19,22 +19,11 @@ use futures_lite::stream::StreamExt;
 use log::{debug, log_enabled, trace, Level};
 use rand::seq::index;
 
-use crate::entry::{CacheEntry, CacheExpiration, CacheReadGuard};
-
-// Define small private macro to unpack entry references.
-macro_rules! unpack {
-    ($entry: expr) => {
-        if $entry.expiration().is_expired() {
-            None
-        } else {
-            Some($entry)
-        }
-    };
-}
+use crate::entry::{CacheEntry, CacheExpiration, CacheReadGuard, CacheWriteGuard};
 
 /// Basic caching structure with asynchronous locking support.
 ///
-/// The returned reference is bound inside a `RwLockReadGuard`.
+/// Returned references are bound inside read or write guards.
 pub struct Cache<K, V> {
     store: RwLock<BTreeMap<K, CacheEntry<V>>>,
     label: String,
@@ -95,7 +84,30 @@ where
 
         Some(CacheReadGuard {
             entry: found as *const CacheEntry<V>,
-            _read: guard,
+            _lock: guard,
+        })
+    }
+
+    /// Retrieve mutable access to an entry inside the cache.
+    ///
+    /// The returned reference holds a write lock on the cache. It should be dropped
+    /// as soon as possible and must not be retained across unrelated `.await` points,
+    /// since no other cache operations can make progress while it exists.
+    pub async fn get_mut<B>(&self, k: &B) -> Option<CacheWriteGuard<'_, K, V>>
+    where
+        K: Borrow<B>,
+        B: Ord + ?Sized,
+    {
+        let mut guard = self.store.write().await;
+        let found = guard.get_mut(k)?;
+
+        if found.expiration().is_expired() {
+            return None;
+        }
+
+        Some(CacheWriteGuard {
+            entry: found as *mut CacheEntry<V>,
+            _lock: guard,
         })
     }
 
@@ -118,12 +130,13 @@ where
         E: Into<CacheExpiration>,
     {
         let entry = CacheEntry::new(v, e.into());
-        self.store
-            .write()
-            .await
-            .insert(k, entry)
-            .and_then(|entry| unpack!(entry))
-            .map(CacheEntry::into_inner)
+        self.store.write().await.insert(k, entry).and_then(|entry| {
+            if entry.expiration().is_expired() {
+                None
+            } else {
+                Some(entry.into_inner())
+            }
+        })
     }
 
     /// Check whether the cache is empty.
@@ -268,12 +281,13 @@ where
         K: Borrow<B>,
         B: Ord + ?Sized,
     {
-        self.store
-            .write()
-            .await
-            .remove(k)
-            .and_then(|entry| unpack!(entry))
-            .map(CacheEntry::into_inner)
+        self.store.write().await.remove(k).and_then(|entry| {
+            if entry.expiration().is_expired() {
+                None
+            } else {
+                Some(entry.into_inner())
+            }
+        })
     }
 
     /// Retrieve the number of unexpired entries inside the cache.
@@ -296,8 +310,7 @@ where
         B: Ord + ?Sized,
         F: FnOnce(&mut V),
     {
-        let mut guard = self.store.write().await;
-        if let Some(entry) = guard.get_mut(k).and_then(|entry| unpack!(entry)) {
+        if let Some(mut entry) = self.get_mut(k).await {
             f(entry.value_mut());
         }
     }

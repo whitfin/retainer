@@ -190,7 +190,6 @@ async fn test_cache_remove_returns_unexpired_value() {
     cache.insert(1, 10, CacheExpiration::none()).await;
 
     assert_eq!(*cache.get(&1).await.unwrap(), 10);
-
     assert_eq!(cache.remove(&1).await, Some(10));
     assert!(cache.is_empty().await);
 }
@@ -201,6 +200,84 @@ async fn test_cache_remove_missing_entry_returns_none() {
 
     assert!(cache.is_empty().await);
     assert_eq!(cache.remove(&1).await, None);
+}
+
+#[tokio::test]
+async fn test_cache_get_mut_changes_value() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.insert(1, 10, CacheExpiration::none()).await;
+    assert_eq!(*cache.get(&1).await.unwrap(), 10);
+
+    *cache.get_mut(&1).await.unwrap() = 20;
+    assert_eq!(*cache.get(&1).await.unwrap(), 20);
+}
+
+#[tokio::test]
+async fn test_cache_get_mut_changes_expiration() {
+    let cache = Cache::<u8, u8>::new();
+    let initial = Instant::now().checked_add(Duration::from_secs(30)).unwrap();
+    let updated = Instant::now().checked_add(Duration::from_secs(60)).unwrap();
+
+    cache.insert(1, 10, initial).await;
+    assert_eq!(
+        cache.get(&1).await.unwrap().expiration().instant(),
+        &Some(initial)
+    );
+
+    *cache.get_mut(&1).await.unwrap().expiration_mut() = updated.into();
+    assert_eq!(
+        cache.get(&1).await.unwrap().expiration().instant(),
+        &Some(updated)
+    );
+}
+
+#[tokio::test]
+async fn test_cache_get_mut_removes_expiration() {
+    let cache = Cache::<u8, u8>::new();
+    let expiration = Instant::now().checked_add(Duration::from_secs(30)).unwrap();
+
+    cache.insert(1, 10, expiration).await;
+    assert_eq!(
+        cache.get(&1).await.unwrap().expiration().instant(),
+        &Some(expiration)
+    );
+
+    *cache.get_mut(&1).await.unwrap().expiration_mut() = CacheExpiration::none();
+    assert_eq!(cache.get(&1).await.unwrap().expiration().instant(), &None);
+}
+
+#[tokio::test]
+async fn test_cache_get_mut_rejects_missing_entry() {
+    let cache = Cache::<u8, u8>::new();
+
+    assert!(cache.get_mut(&1).await.is_none());
+}
+
+#[tokio::test]
+async fn test_cache_get_mut_rejects_expired_entry() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.insert(1, 10, expired_instant()).await;
+    assert_eq!(cache.expired().await, 1);
+
+    assert!(cache.get_mut(&1).await.is_none());
+
+    assert_eq!(cache.expired().await, 1);
+}
+
+#[tokio::test]
+async fn test_cache_get_mut_accepts_borrowed_key() {
+    let cache = Cache::<String, u8>::new();
+
+    cache
+        .insert("key".to_owned(), 10, CacheExpiration::none())
+        .await;
+    assert_eq!(*cache.get("key").await.unwrap(), 10);
+
+    *cache.get_mut("key").await.unwrap() = 20;
+
+    assert_eq!(*cache.get("key").await.unwrap(), 20);
 }
 
 #[tokio::test]

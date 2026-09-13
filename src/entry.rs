@@ -1,13 +1,13 @@
 //! Small structures based around entries in the cache.
 //!
 //! Each entry has an associated value and optional expiration,
-//! and access functions for both. To be more convenient to the
-//! called, a `CacheEntry<V>` will also dereference to `V`.
+//! and cache guards provide access functions for both. For convenience,
+//! cache guards also dereference to the guarded value.
 use std::collections::BTreeMap;
-use std::ops::{Deref, Range};
+use std::ops::{Deref, DerefMut, Range};
 use std::time::{Duration, Instant};
 
-use async_lock::RwLockReadGuard;
+use async_lock::{RwLockReadGuard, RwLockWriteGuard};
 use rand::prelude::*;
 
 /// Represents an entry inside the cache.
@@ -29,6 +29,11 @@ impl<V> CacheEntry<V> {
     /// Retrieve the internal expiration.
     pub fn expiration(&self) -> &CacheExpiration {
         &self.expiration
+    }
+
+    /// Retrieve the mutable internal expiration.
+    pub(crate) fn expiration_mut(&mut self) -> &mut CacheExpiration {
+        &mut self.expiration
     }
 
     /// Retrieve the internal value.
@@ -139,7 +144,7 @@ impl From<Range<u64>> for CacheExpiration {
 #[derive(Debug)]
 pub struct CacheReadGuard<'a, K, V> {
     pub(crate) entry: *const CacheEntry<V>,
-    pub(crate) _read: RwLockReadGuard<'a, BTreeMap<K, CacheEntry<V>>>,
+    pub(crate) _lock: RwLockReadGuard<'a, BTreeMap<K, CacheEntry<V>>>,
 }
 
 impl<K, V> CacheReadGuard<'_, K, V> {
@@ -178,6 +183,83 @@ where
 }
 
 unsafe impl<K, V> Sync for CacheReadGuard<'_, K, V>
+where
+    K: Sync,
+    V: Sync,
+{
+}
+
+/// Write guard for mutable references to the inner cache structure.
+///
+/// This structure retains the cache's write lock, ensuring exclusive access to
+/// the referenced entry while it is in use. It should be dropped as soon as
+/// possible and must not be retained across unrelated `.await` points, since no
+/// other cache operations can make progress while it exists. It implements
+/// `Deref` and `DerefMut` to expose the inner value.
+#[derive(Debug)]
+pub struct CacheWriteGuard<'a, K, V> {
+    pub(crate) entry: *mut CacheEntry<V>,
+    pub(crate) _lock: RwLockWriteGuard<'a, BTreeMap<K, CacheEntry<V>>>,
+}
+
+impl<K, V> CacheWriteGuard<'_, K, V> {
+    /// Retrieve the internal guarded expiration.
+    pub fn expiration(&self) -> &CacheExpiration {
+        self.entry().expiration()
+    }
+
+    /// Retrieve the mutable internal guarded expiration.
+    pub fn expiration_mut(&mut self) -> &mut CacheExpiration {
+        self.entry_mut().expiration_mut()
+    }
+
+    /// Retrieve the internal guarded value.
+    pub fn value(&self) -> &V {
+        self.entry().value()
+    }
+
+    /// Retrieve the mutable internal guarded value.
+    pub fn value_mut(&mut self) -> &mut V {
+        self.entry_mut().value_mut()
+    }
+
+    /// Retrieve a reference to the internal entry.
+    fn entry(&self) -> &CacheEntry<V> {
+        unsafe { &*self.entry }
+    }
+
+    /// Retrieve a mutable reference to the internal entry.
+    fn entry_mut(&mut self) -> &mut CacheEntry<V> {
+        unsafe { &mut *self.entry }
+    }
+}
+
+impl<K, V> Deref for CacheWriteGuard<'_, K, V> {
+    type Target = V;
+
+    // Derefs a cache guard to the internal entry.
+    fn deref(&self) -> &Self::Target {
+        self.value()
+    }
+}
+
+impl<K, V> DerefMut for CacheWriteGuard<'_, K, V> {
+    // Mutably derefs a cache guard to the internal entry.
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.value_mut()
+    }
+}
+
+// The pointer is protected by the retained write guard. Moving or sharing the
+// wrapper is safe whenever the complete guarded map is safe to move or share.
+unsafe impl<K, V> Send for CacheWriteGuard<'_, K, V>
+where
+    K: Send,
+    V: Send,
+{
+}
+
+unsafe impl<K, V> Sync for CacheWriteGuard<'_, K, V>
 where
     K: Sync,
     V: Sync,
