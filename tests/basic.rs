@@ -222,7 +222,7 @@ async fn test_cache_get_reports_expiration_metadata() {
 }
 
 #[tokio::test]
-async fn test_cache_purge_removes_all_expired_entries() {
+async fn test_cache_purge_removes_all_expired_entries_with_oversized_sample() {
     let cache = Cache::<u8, u8>::new();
 
     cache.insert(1, 10, expired_instant()).await;
@@ -232,11 +232,28 @@ async fn test_cache_purge_removes_all_expired_entries() {
     assert_eq!(cache.expired().await, 2);
     assert_eq!(cache.unexpired().await, 1);
 
-    cache.purge(3, 0.25).await;
+    cache.purge(25, 0.25).await;
 
     assert_eq!(cache.len().await, 1);
     assert_eq!(cache.expired().await, 0);
     assert_eq!(*cache.get(&3).await.unwrap(), 30);
+}
+
+#[tokio::test]
+async fn test_cache_purge_removes_only_one_partial_sample() {
+    let cache = Cache::<u8, u8>::new();
+
+    for key in 0..5 {
+        cache.insert(key, key, expired_instant()).await;
+    }
+
+    assert_eq!(cache.len().await, 5);
+    assert_eq!(cache.expired().await, 5);
+
+    cache.purge(2, 1.0).await;
+
+    assert_eq!(cache.len().await, 3);
+    assert_eq!(cache.expired().await, 3);
 }
 
 #[tokio::test]
@@ -248,6 +265,72 @@ async fn test_cache_purge_accepts_empty_cache() {
     cache.purge(25, 0.25).await;
 
     assert!(cache.is_empty().await);
+}
+
+#[tokio::test]
+async fn test_cache_purge_accepts_zero_threshold() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.insert(1, 10, CacheExpiration::none()).await;
+    assert_eq!(cache.unexpired().await, 1);
+
+    tokio::time::timeout(Duration::from_secs(1), cache.purge(1, 0.0))
+        .await
+        .expect("zero-threshold purge did not terminate");
+
+    assert_eq!(cache.unexpired().await, 1);
+}
+
+#[tokio::test]
+async fn test_cache_purge_accepts_one_threshold() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.insert(1, 10, expired_instant()).await;
+    assert_eq!(cache.expired().await, 1);
+
+    cache.purge(1, 1.0).await;
+
+    assert!(cache.is_empty().await);
+}
+
+#[tokio::test]
+#[should_panic(expected = "sample must be > 0")]
+async fn test_cache_purge_rejects_zero_sample() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.purge(0, 0.25).await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "threshold must be 0..=1")]
+async fn test_cache_purge_rejects_negative_threshold() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.purge(1, -0.1).await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "threshold must be 0..=1")]
+async fn test_cache_purge_rejects_threshold_above_one() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.purge(1, 1.1).await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "threshold must be 0..=1")]
+async fn test_cache_purge_rejects_non_finite_threshold() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.purge(1, f64::NAN).await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "frequency must be > 0")]
+async fn test_cache_monitor_rejects_zero_frequency() {
+    let cache = Cache::<u8, u8>::new();
+
+    cache.monitor(1, 0.25, Duration::from_secs(0)).await;
 }
 
 #[test]

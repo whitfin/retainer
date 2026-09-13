@@ -9,13 +9,13 @@
 //! the entry set on an interval to prune the inner tree over time. More information
 //! on how this works can be seen on the `monitor` method of the `Cache` type.
 use std::cmp;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use async_lock::{RwLock, RwLockUpgradableReadGuard};
 use async_timer::Interval;
 use log::{debug, log_enabled, trace, Level};
-use rand::prelude::*;
+use rand::seq::index;
 
 use crate::entry::{CacheEntry, CacheExpiration, CacheReadGuard};
 
@@ -132,6 +132,10 @@ where
     ///
     /// For expiration logic, please see `Cache::purge`, as this is used under the hood.
     pub async fn monitor(&self, sample: usize, threshold: f64, frequency: Duration) {
+        assert!(sample > 0, "sample must be > 0");
+        assert!((0.0..=1.0).contains(&threshold), "threshold must be 0..=1");
+        assert!(frequency > Duration::from_secs(0), "frequency must be > 0");
+
         let mut interval = Interval::platform_new(frequency);
         loop {
             interval.as_mut().await;
@@ -148,12 +152,15 @@ where
     /// 3. Remove any expired keys from the sample.
     /// 4. Based on `threshold` percentage:
     ///     4a. If more than `threshold` were expired, goto #2.
-    ///     4b. If less than `threshold` were expired, goto #1.
+    ///     4b. If less than or equal to `threshold` were expired, goto #1.
     ///
     /// This means that at any point you may have up to `threshold` percent of your
     /// cache storing expired entries (assuming the monitor just ran), so make sure
     /// to tune your frequency, sample size, and threshold accordingly.
     pub async fn purge(&self, sample: usize, threshold: f64) {
+        assert!(sample > 0, "sample must be > 0");
+        assert!((0.0..=1.0).contains(&threshold), "threshold must be 0..=1");
+
         let start = Instant::now();
 
         let mut locked = Duration::from_nanos(0);
@@ -172,58 +179,34 @@ where
             let total = store.len();
             let sample = cmp::min(sample, total);
 
-            // counter to track removed keys
-            let mut gone = 0;
+            // generate unique indices without a collision loop, and prepare to walk the store
+            let mut indices = index::sample(&mut rand::thread_rng(), total, sample).into_vec();
+            let mut entries = store.iter();
 
-            // create our temporary key store and index tree
-            let mut keys = Vec::with_capacity(sample);
-            let mut indices: BTreeSet<usize> = BTreeSet::new();
+            // sort to visit in order
+            indices.sort_unstable();
 
-            {
-                // fetch `sample` keys at random
-                let mut rng = rand::thread_rng();
-                while indices.len() < sample {
-                    indices.insert(rng.gen_range(0..total));
+            let mut keys = Vec::new();
+            let mut previous = 0;
+
+            // walk the inner mapping at most once to locate our
+            for (position, index) in indices.into_iter().enumerate() {
+                let offset = if position == 0 {
+                    index
+                } else {
+                    index - previous - 1
+                };
+
+                let (key, entry) = entries.nth(offset).expect("sampled cache index must exist");
+
+                if entry.expiration().is_expired() {
+                    keys.push(key.clone());
                 }
+
+                previous = index;
             }
 
-            {
-                // tracker for previous index
-                let mut prev = 0;
-
-                // boxed iterator to allow us to iterate a single time for all indices
-                let mut iter: Box<dyn Iterator<Item = (&K, &CacheEntry<V>)>> =
-                    Box::new(store.iter());
-
-                // walk our index list
-                for idx in indices {
-                    // calculate how much we need to shift the iterator
-                    let offset = idx
-                        .checked_sub(prev)
-                        .and_then(|idx| idx.checked_sub(1))
-                        .unwrap_or(0);
-
-                    // shift and mark the current index
-                    iter = Box::new(iter.skip(offset));
-                    prev = idx;
-
-                    // fetch the next pair (at our index)
-                    let (key, entry) = iter.next().unwrap();
-
-                    // skip if not expired
-                    if !entry.expiration().is_expired() {
-                        continue;
-                    }
-
-                    // otherwise mark for removal
-                    keys.push(key.to_owned());
-
-                    // and increment remove count
-                    gone += 1;
-                }
-            }
-
-            {
+            if !keys.is_empty() {
                 // upgrade to a write guard so that we can make our changes
                 let acquired = Instant::now();
                 let mut store = RwLockUpgradableReadGuard::upgrade(store).await;
@@ -237,6 +220,10 @@ where
                 locked = locked.checked_add(acquired.elapsed()).unwrap();
             }
 
+            // calculate removal ratio
+            let gone = keys.len();
+            let ratio = gone as f64 / sample as f64;
+
             // log out now many of the sampled keys were removed
             if log_enabled!(Level::Trace) {
                 trace!(
@@ -244,7 +231,7 @@ where
                     self.label,
                     gone,
                     sample,
-                    (gone as f64 / sample as f64) * 100f64,
+                    ratio * 100f64,
                 );
             }
 
@@ -252,7 +239,7 @@ where
             removed += gone;
 
             // break the loop if we don't meet thresholds
-            if (gone as f64) < (sample as f64 * threshold) {
+            if ratio <= threshold {
                 break;
             }
         }
